@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { RouteLocationRaw } from 'vue-router'
 import { resolveComponent } from 'vue'
 import FwIcon from './FwIcon.vue'
 import FwMedia from './FwMedia.vue'
@@ -11,7 +12,7 @@ const props = defineProps<{
   imageAlt?: string
   thumb?: boolean
   href?: string
-  to?: string | Record<string, unknown>
+  to?: RouteLocationRaw
 }>()
 const tag = props.to ? resolveComponent('RouterLink') : 'a'
 </script>

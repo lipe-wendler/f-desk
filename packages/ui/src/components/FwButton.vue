@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { RouteLocationRaw } from 'vue-router'
 import { computed, resolveComponent } from 'vue'
 import FwIcon from './FwIcon.vue'
 import type { IconName } from './icons'
@@ -15,7 +16,7 @@ const props = withDefaults(
     icon?: IconName
     iconLeft?: IconName
     href?: string
-    to?: string | Record<string, unknown>
+    to?: RouteLocationRaw
     type?: 'button' | 'submit' | 'reset'
   }>(),
   { variant: 'primary', size: 'md', type: 'button' },
