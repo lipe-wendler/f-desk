@@ -1,0 +1,12 @@
+branch="$(git rev-parse --abbrev-ref HEAD)"
+
+if [ "$branch" = "main" ]; then
+  echo "✖ Push direto na main não é permitido. Crie uma branch para a tarefa e abra um PR."
+  exit 1
+fi
+
+if ! echo "$branch" | grep -Eq '^(feat|fix|chore|docs|refactor|test|ci|style|perf|build)/[a-z0-9]+(-[a-z0-9]+)*$'; then
+  echo "✖ Nome de branch inválido: $branch"
+  echo "  Use <tipo>/<descricao-da-tarefa-em-kebab-case>, ex.: feat/telas-de-login-e-cadastro"
+  exit 1
+fi

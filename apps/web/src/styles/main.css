@@ -1,0 +1,6 @@
+@import 'tailwindcss';
+@import '@f-desk/ui/theme.css';
+@import '@f-desk/ui/styles.css';
+
+/* As classes fw-* do design system ficam fora das camadas do Tailwind e vencem utilitários
+   em conflito; para sobrescrever um componente, prefira props/variantes ou uma classe local. */

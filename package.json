@@ -1,0 +1,31 @@
+{
+  "name": "f-desk",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "db:generate": "pnpm --filter @f-desk/db generate",
+    "db:migrate": "pnpm --filter @f-desk/db migrate",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^21.2.3",
+    "@commitlint/config-conventional": "^21.2.3",
+    "@f-desk/config": "workspace:*",
+    "eslint": "^10.11.0",
+    "husky": "^9.1.7",
+    "prettier": "^3.9.9",
+    "turbo": "^2.11.6",
+    "typescript": "^6.0.3"
+  }
+}
