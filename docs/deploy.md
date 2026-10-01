@@ -16,5 +16,52 @@ Um único projeto Vercel (`f-desk`) a partir da raiz do repositório. O `vercel.
    - `BETTER_AUTH_SECRET` (`openssl rand -base64 32`)
    - `BETTER_AUTH_URL` só em Production, com o domínio final (nos previews a URL do deploy é usada sozinha)
    - `ANTHROPIC_API_KEY` (a partir da tarefa do chatbot)
-4. Rodar as migrations e o seed contra o banco de produção, fora do build:
-   `pnpm db:migrate` e `pnpm --filter api seed:admin` com o `.env` apontando para ele.
+4. Rodar as migrations e o seed contra o banco de produção, fora do build (ver abaixo).
+
+## Neon
+
+Projeto **`f-desk`** (`divine-haze-24115227`, `aws-sa-east-1`, Postgres 18, database `f-database`).
+Branches: `production` (padrão, usado pela Vercel em produção), `vercel-dev` e um `preview/<branch-git>`
+criado pela integração para cada preview.
+
+### CLI na máquina local
+
+```bash
+npm i -g neon@latest
+neon auth                       # login no navegador (no ambiente cloud do Claude: NEON_API_KEY)
+neon link --project-id divine-haze-24115227 --branch production -y
+```
+
+O `neon link` grava o contexto em `.neon` e puxa `DATABASE_URL`, `DATABASE_URL_UNPOOLED` e `NEON_BRANCH`
+para o `.env.local` (os dois ficam fora do git). Para trocar de branch: `neon checkout <branch>` e
+`neon env pull`. Todos os scripts do repositório leem `.env` e `.env.local` da raiz.
+
+### Configuração como código (`neon.ts`)
+
+A política em `neon.ts` está vazia de propósito: o F.Desk usa só o Postgres (o login é o better-auth da
+nossa API, sem Neon Auth, Data API ou Functions).
+
+```bash
+neon config plan   # mostra o que mudaria no branch linkado
+neon deploy        # aplica a política
+```
+
+### Migrations e primeiro admin
+
+```bash
+pnpm db:migrate                # aplica packages/db/drizzle no branch do DATABASE_URL
+pnpm --filter api seed:admin   # cria o primeiro admin (ADMIN_EMAIL / ADMIN_PASSWORD no ambiente)
+```
+
+- As migrations usam o driver HTTP do Neon (`packages/db/src/migrate.ts`): funcionam onde só há HTTPS,
+  como CI e ambientes que bloqueiam a porta 5432.
+- Cada preview da Vercel ganha um branch do Neon copiado do `production` **no momento em que é criado**.
+  Um branch de preview criado antes de uma migration não tem as tabelas novas: rode
+  `neon checkout preview/<branch-git> && neon env pull && pnpm db:migrate` para atualizá-lo.
+- Estado atual do `production`: migration `0000_auth-inicial` aplicada e admin criado.
+
+### Agentes (Claude Code)
+
+- Skills da Neon em `.claude/skills/neon*` (atualize com `neon skills update`).
+- MCP da Neon em `.mcp.json`, fixado no projeto `divine-haze-24115227`. O login acontece no primeiro uso
+  (OAuth), então nenhuma chave fica no repositório.
