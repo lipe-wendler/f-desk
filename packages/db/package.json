@@ -8,9 +8,9 @@
     "./schema": "./src/schema/index.ts"
   },
   "scripts": {
-    "generate": "node --env-file-if-exists=../../.env ./node_modules/drizzle-kit/bin.cjs generate",
-    "migrate": "node --env-file-if-exists=../../.env ./node_modules/drizzle-kit/bin.cjs migrate",
-    "studio": "node --env-file-if-exists=../../.env ./node_modules/drizzle-kit/bin.cjs studio",
+    "generate": "node --env-file-if-exists=../../.env --env-file-if-exists=../../.env.local ./node_modules/drizzle-kit/bin.cjs generate",
+    "migrate": "tsx --env-file-if-exists=../../.env --env-file-if-exists=../../.env.local src/migrate.ts",
+    "studio": "node --env-file-if-exists=../../.env --env-file-if-exists=../../.env.local ./node_modules/drizzle-kit/bin.cjs studio",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json"
   },
@@ -23,6 +23,7 @@
     "@types/node": "^22.20.5",
     "drizzle-kit": "^0.31.11",
     "eslint": "^10.11.0",
+    "tsx": "^4.23.15",
     "typescript": "~6.0.3"
   }
 }
