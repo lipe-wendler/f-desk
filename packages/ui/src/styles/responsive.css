@@ -1,0 +1,27 @@
+/* Ajustes do F.Desk sobre o CSS importado do design system (que foi desenhado para desktop).
+   Mantidos aqui para que components.css continue igual à fonte. */
+@media (max-width: 640px) {
+  .fw-header {
+    gap: var(--space-3);
+    padding: 0 var(--space-4);
+  }
+  .fw-header .fw-wordmark {
+    font-size: 20px;
+  }
+  .fw-nav {
+    gap: var(--space-4);
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .fw-header-actions {
+    gap: var(--space-2);
+  }
+  .fw-stepper {
+    grid-auto-flow: row;
+    gap: var(--space-4);
+  }
+  .fw-step::before {
+    display: none;
+  }
+}
