@@ -66,6 +66,22 @@ Preto, amarelo e concreto; precisa, humana, sem ruído.
 
 - **Dark é o tema padrão**; light é a variação. Os dois usam os mesmos nomes de token — nunca escreva hex em componente.
 - Paleta da marca (`brand-*`): amarelo `brand-yellow` #FFC629, preto `brand-black` #0B0B0B, grafite `brand-graphite` #1E1E1E, stone `brand-stone` #363636, cinzas `brand-gray`/`brand-fog`/`brand-mist`/`brand-smoke`, brancos `brand-white`/`brand-paper`. Componentes consomem os tokens semânticos, que apontam para ela.
+- **Dark do F.Desk com os neutros quentes da Anthropic.** No tema escuro, os neutros frios da marca deram lugar aos tons do Claude.ai; o amarelo continua sendo o único acento. O tema light não mudou.
+
+  | token                     | dark               | antes (F.Wendler) |
+  | ------------------------- | ------------------ | ----------------- |
+  | `bg`                      | `warm-900` #1F1E1D | #0B0B0B           |
+  | `surface`                 | `warm-800` #262624 | #131313           |
+  | `surface-raised`, `field` | `warm-700` #30302E | #1E1E1E           |
+  | `line`                    | `warm-600` #3D3D3A | #363636           |
+  | `line-strong`             | `warm-500` #85837C | #6B6B6B           |
+  | `ink`                     | `ivory` #FAF9F5    | #F5F5F5           |
+  | `ink-muted`               | `warm-fog` #C2C0B6 | #A3A3A3           |
+  | `on-accent`               | `slate` #141413    | #0B0B0B           |
+  | `accent-soft`             | #3B3115            | #2A2206           |
+
+  Os valores foram conferidos com `check:contrast`: texto ≥4.5:1 e contornos/foco ≥3:1 em todas as superfícies.
+
 - Página em `bg`; cards e painéis em `surface`; trilhos, hover e camadas acima em `surface-raised`; inputs em `field`.
 - Texto em `ink`; secundário em `ink-muted`. Ambos passam 4.5:1 em `bg`, `surface` e `surface-raised` nos dois temas.
 - O amarelo é acento, não fundo: `accent` preenche o CTA primário, a tab ativa, controles ligados e marcadores — texto sobre ele sempre `on-accent` (preto). Em uma tela, o amarelo ocupa no máximo ~10% da área.
@@ -87,7 +103,7 @@ Três famílias, cada uma com um papel fixo — nunca troque os papéis:
 
 - Grade de 4px: `space-1` 4 → `space-9` 96. Card: padding `space-5`; painel de seção: `space-6`; entre seções: `space-7`–`space-9`.
 - Raios: `radius-sm` (inputs), `radius-md` (cards, thumbnails), `radius-lg` (painéis, hero), `radius-pill` (tudo que é acionável e curto — botões, tags, tabs, switch).
-- Profundidade no dark vem de camadas (`bg` → `surface` → `surface-raised`) + `line`, sem sombra. No light, `shadow-card` suave em cards e painéis. `shadow-glow` só no hover do primário e no passo atual do stepper.
+- Profundidade no dark vem de camadas quentes (`bg` → `surface` → `surface-raised`) + `line`, sem sombra. No light, `shadow-card` suave em cards e painéis. `shadow-glow` só no hover do primário e no passo atual do stepper.
 - Alturas de controle: `control-sm` 36, `control-md` 44, `control-lg` 56. Conteúdo até `container` 1280px.
 
 ## Estados e movimento
