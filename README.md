@@ -37,21 +37,25 @@ Requisitos: Node 22 e pnpm 10 (`corepack enable`).
 
 ```bash
 pnpm install
-cp .env.example .env          # preencha DATABASE_URL (Neon) e BETTER_AUTH_SECRET
-pnpm db:migrate               # cria as tabelas no Neon
-pnpm --filter api seed:admin  # cria o primeiro admin (ADMIN_EMAIL / ADMIN_PASSWORD)
+npm i -g neon@latest && neon auth
+neon link --project-id divine-haze-24115227 --branch production -y   # gera .env.local com DATABASE_URL
+cp .env.example .env          # opcional: BETTER_AUTH_SECRET etc. (dev tem valores padrão)
 pnpm dev                      # web em http://localhost:5173 e API em http://localhost:3000/api
 ```
+
+O banco de produção já está migrado e com o primeiro admin. Para trabalhar sem mexer nele, use um branch
+do Neon (`neon checkout <nome>` + `neon env pull` + `pnpm db:migrate`). Detalhes em [docs/deploy.md](docs/deploy.md#neon).
 
 O Vite repassa `/api` para a API, então site e API ficam no mesmo domínio, como na Vercel.
 A vitrine do design system fica em `http://localhost:5173/design-system` (só em dev).
 
-| Comando                                                     | O que faz                   |
-| ----------------------------------------------------------- | --------------------------- |
-| `pnpm dev`                                                  | Sobe web e API              |
-| `pnpm lint` · `pnpm typecheck` · `pnpm test` · `pnpm build` | Checagens (as mesmas do CI) |
-| `pnpm format`                                               | Prettier no repositório     |
-| `pnpm db:generate` · `pnpm db:migrate`                      | Migrations do Drizzle       |
+| Comando                                                     | O que faz                    |
+| ----------------------------------------------------------- | ---------------------------- |
+| `pnpm dev`                                                  | Sobe web e API               |
+| `pnpm lint` · `pnpm typecheck` · `pnpm test` · `pnpm build` | Checagens (as mesmas do CI)  |
+| `pnpm format`                                               | Prettier no repositório      |
+| `pnpm db:generate` · `pnpm db:migrate`                      | Migrations do Drizzle        |
+| `neon config plan` · `neon deploy`                          | Política do Neon (`neon.ts`) |
 
 ## Documentação
 

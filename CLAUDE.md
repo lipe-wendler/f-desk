@@ -24,3 +24,11 @@ Sistema de tickets da F.Wendler. Leia `README.md` e `docs/arquitetura.md` antes 
   sempre na API (`requireRole`); o router do web só espelha.
 - Textos da interface em português do Brasil; voz da marca no `packages/ui/README.md`.
 - Schema do banco em `packages/db/src/schema`; mudou? `pnpm db:generate` e versione a migration.
+
+## Neon
+
+- Projeto `divine-haze-24115227` (branch padrão `production`). Use as skills `neon*` em `.claude/skills/`
+  e o MCP da Neon (`.mcp.json`) quando precisar mexer no banco ou em branches.
+- No ambiente cloud, o CLI autentica por `NEON_API_KEY`; `neon link` gera `.env.local` (fora do git).
+- A porta 5432 pode estar bloqueada: use o driver HTTP (`pnpm db:migrate` já usa) em vez de `psql`.
+- Teste migrations num branch do Neon antes do `production`; nunca rode dados de teste no `production`.
