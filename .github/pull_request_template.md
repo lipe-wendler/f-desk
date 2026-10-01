@@ -7,6 +7,7 @@
 ## Como testar
 
 ## Checklist
+
 - [ ] Branch criada a partir da `main` com nome `<tipo>/<descricao-da-tarefa>`
 - [ ] Commits em Conventional Commits (kebab-case)
 - [ ] `pnpm lint`, `pnpm typecheck`, `pnpm test` e `pnpm build` passando
