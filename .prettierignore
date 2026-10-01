@@ -1,0 +1,7 @@
+pnpm-lock.yaml
+dist
+coverage
+.turbo
+*.woff2
+packages/ui/src/styles/tokens.css
+packages/db/drizzle
