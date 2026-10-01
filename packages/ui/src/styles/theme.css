@@ -1,0 +1,48 @@
+/*
+ * Ponte entre os tokens F.Wendler e o Tailwind v4.
+ * Importe depois de `@import 'tailwindcss'`. Gera utilitários como
+ * `bg-surface`, `text-ink`, `border-line`, `font-display`, `rounded-md`, `shadow-card`, `p-5`.
+ * Os valores apontam para as variáveis de tokens.css, então trocam com `data-theme`.
+ */
+@theme inline {
+  --color-*: initial;
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-field: var(--field);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-on-accent: var(--on-accent);
+  --color-accent-text: var(--accent-text);
+  --color-accent-soft: var(--accent-soft);
+  --color-focus: var(--focus);
+  --color-success: var(--success);
+  --color-danger: var(--danger);
+  --color-transparent: transparent;
+  --color-current: currentColor;
+
+  --font-*: initial;
+  --font-display: var(--font-display);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+
+  --radius-*: initial;
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-pill: var(--radius-pill);
+
+  --shadow-*: initial;
+  --shadow-card: var(--shadow-card);
+  --shadow-pop: var(--shadow-pop);
+  --shadow-glow: var(--shadow-glow);
+
+  /* Grade de 4px: p-1 = 4px … p-24 = 96px, alinhada a space-1…space-9. */
+  --spacing: 4px;
+
+  --container-content: var(--container);
+}

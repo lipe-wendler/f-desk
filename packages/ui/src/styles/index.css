@@ -1,0 +1,5 @@
+/* Ponto de entrada do design system: fontes, tokens, base e componentes. */
+@import './fonts.css';
+@import './tokens.css';
+@import './base.css';
+@import './components.css';

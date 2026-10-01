@@ -25,6 +25,8 @@ export default defineConfig(
       '@typescript-eslint/consistent-type-imports': 'error',
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       'vue/multi-word-component-names': 'off',
+      // Props opcionais tipadas em TS já são `undefined` por padrão.
+      'vue/require-default-prop': 'off',
     },
   },
   prettier,

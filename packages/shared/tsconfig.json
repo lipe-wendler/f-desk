@@ -1,0 +1,4 @@
+{
+  "extends": "@f-desk/config/tsconfig.base.json",
+  "include": ["src"]
+}

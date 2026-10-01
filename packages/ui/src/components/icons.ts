@@ -1,0 +1,65 @@
+// Ícones de traço 24×24, linha 1.6, pontas arredondadas (compatíveis com o estilo Lucide).
+// Os 24 primeiros vêm do design system F.Wendler; os do bloco "F.Desk" atendem o helpdesk.
+export const ICONS = {
+  'arrow-right': ['M5 12h14', 'M13 6l6 6-6 6'],
+  search: ['M11 4a7 7 0 1 0 0 14a7 7 0 1 0 0-14z', 'M20 20l-4-4'],
+  user: ['M12 4a4 4 0 1 0 0 8a4 4 0 1 0 0-8z', 'M4 20c1.5-3.5 4.5-5 8-5s6.5 1.5 8 5'],
+  users: [
+    'M9 5a3.5 3.5 0 1 0 0 7a3.5 3.5 0 1 0 0-7z',
+    'M2.5 20c1-3.2 3.5-5 6.5-5s5.5 1.8 6.5 5',
+    'M16 5.3a3.5 3.5 0 0 1 0 6.4',
+    'M18 15.2c1.8.7 3 2.3 3.5 4.8',
+  ],
+  database: [
+    'M12 3c4.4 0 8 1.3 8 3s-3.6 3-8 3s-8-1.3-8-3s3.6-3 8-3z',
+    'M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6',
+    'M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3',
+  ],
+  settings: [
+    'M12 9a3 3 0 1 0 0 6a3 3 0 1 0 0-6z',
+    'M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1',
+  ],
+  zap: ['M13 2L4 14h7l-1 8l9-12h-7z'],
+  'bar-chart': ['M5 20v-6', 'M10 20V9', 'M15 20v-9', 'M20 20V5', 'M3 20h18'],
+  link: [
+    'M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1',
+    'M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1',
+  ],
+  box: ['M12 2.8l8 4.6v9.2l-8 4.6l-8-4.6V7.4z', 'M4 7.4l8 4.6l8-4.6', 'M12 12v9.2'],
+  file: [
+    'M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z',
+    'M14 3v5h5',
+    'M9 13h6M9 17h6',
+  ],
+  folder: ['M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z'],
+  download: ['M12 4v11', 'M7 10l5 5l5-5', 'M4 20h16'],
+  heart: ['M12 20s-7.5-4.6-7.5-10A4.3 4.3 0 0 1 12 7.3A4.3 4.3 0 0 1 19.5 10c0 5.4-7.5 10-7.5 10z'],
+  mail: ['M4 6h16v12H4z', 'M4 7l8 6l8-6'],
+  'chevron-down': ['M6 9l6 6l6-6'],
+  check: ['M5 12.5l4.5 4.5L19 7.5'],
+  alert: ['M12 3.5l9 16H3z', 'M12 10v4', 'M12 17h.01'],
+  star: ['M12 3.5l2.6 5.4l5.9.8l-4.3 4.1l1 5.8L12 16.8l-5.2 2.8l1-5.8l-4.3-4.1l5.9-.8z'],
+  triangle: ['M12 4l8.5 15h-17z', 'M12 10v5'],
+  target: [
+    'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18z',
+    'M12 7.5a4.5 4.5 0 1 0 0 9a4.5 4.5 0 1 0 0-9z',
+    'M12 11.2a.8.8 0 1 0 0 1.6a.8.8 0 1 0 0-1.6z',
+  ],
+  sun: [
+    'M12 8a4 4 0 1 0 0 8a4 4 0 1 0 0-8z',
+    'M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4',
+  ],
+  menu: ['M4 7h16M4 12h16M4 17h16'],
+  close: ['M6 6l12 12M18 6L6 18'],
+  // F.Desk
+  message: ['M4 5h16v11H9l-5 4z'],
+  plus: ['M12 5v14M5 12h14'],
+  clock: ['M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18z', 'M12 7.5V12l3 2'],
+  inbox: ['M3 13l3-8h12l3 8v6H3z', 'M3 13h5l1 3h6l1-3h5'],
+  'log-out': ['M9 20H5V4h4', 'M16 16l4-4l-4-4', 'M20 12H9'],
+  shield: ['M12 3l8 3v6c0 4.5-3.4 8.2-8 9c-4.6-.8-8-4.5-8-9V6z'],
+  moon: ['M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z'],
+} as const satisfies Record<string, readonly string[]>
+
+export type IconName = keyof typeof ICONS
+export const ICON_NAMES = Object.keys(ICONS) as IconName[]

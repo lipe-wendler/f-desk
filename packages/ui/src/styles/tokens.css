@@ -1,0 +1,80 @@
+/* Gerado por scripts/build-tokens.ts a partir de src/tokens/tokens.json — não edite à mão. */
+
+:root,
+[data-theme='dark'] {
+  color-scheme: dark;
+  --brand-yellow: #FFC629;
+  --brand-yellow-deep: #F4C430;
+  --brand-yellow-ink: #8A6500;
+  --brand-black: #0B0B0B;
+  --brand-graphite: #1E1E1E;
+  --brand-stone: #363636;
+  --brand-gray: #6B6B6B;
+  --brand-fog: #A3A3A3;
+  --brand-mist: #D9D9D9;
+  --brand-smoke: #EEEEEE;
+  --brand-white: #F5F5F5;
+  --brand-paper: #FFFFFF;
+  --bg: var(--brand-black);
+  --surface: #131313;
+  --surface-raised: var(--brand-graphite);
+  --field: var(--brand-graphite);
+  --line: var(--brand-stone);
+  --line-strong: var(--brand-gray);
+  --ink: var(--brand-white);
+  --ink-muted: var(--brand-fog);
+  --accent: var(--brand-yellow);
+  --accent-hover: #FFD452;
+  --on-accent: var(--brand-black);
+  --accent-text: var(--brand-yellow);
+  --accent-soft: #2A2206;
+  --focus: var(--brand-yellow);
+  --success: #5CCB8A;
+  --danger: #FF7A6B;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+  --space-9: 96px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+  --shadow-card: none;
+  --shadow-pop: 0 12px 32px rgba(0,0,0,0.5);
+  --shadow-glow: 0 0 0 4px rgba(255,198,41,0.16);
+  --control-sm: 36px;
+  --control-md: 44px;
+  --control-lg: 56px;
+  --header-height: 72px;
+  --container: 1280px;
+  --font-display: "Urbanist", "DM Sans", system-ui, sans-serif;
+  --font-sans: "DM Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "Space Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+
+[data-theme='light'] {
+  color-scheme: light;
+  --bg: var(--brand-white);
+  --surface: var(--brand-paper);
+  --surface-raised: var(--brand-smoke);
+  --field: var(--brand-paper);
+  --line: var(--brand-mist);
+  --line-strong: #858585;
+  --ink: #1F1F1F;
+  --ink-muted: var(--brand-gray);
+  --accent: var(--brand-yellow-deep);
+  --accent-hover: #E8B720;
+  --accent-text: var(--brand-yellow-ink);
+  --accent-soft: #FFF4CC;
+  --focus: #1F1F1F;
+  --success: #1E7A46;
+  --danger: #C0362C;
+  --shadow-card: 0 1px 2px rgba(15,15,15,0.04), 0 8px 24px rgba(15,15,15,0.06);
+  --shadow-pop: 0 12px 32px rgba(15,15,15,0.12);
+  --shadow-glow: 0 0 0 4px rgba(244,196,48,0.28);
+}

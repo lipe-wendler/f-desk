@@ -1,0 +1,14 @@
+/* Base mínima do F.Desk sobre os tokens: fundo, tinta e tipografia padrão. */
+html,
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  margin: 0;
+  font-size: 16px;
+  line-height: 24px;
+}
