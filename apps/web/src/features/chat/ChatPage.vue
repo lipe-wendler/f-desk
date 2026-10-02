@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { CHAT_INPUT_MAX, FAQ, FAQ_CATEGORIES, type FaqCategory } from '@f-desk/shared'
-import { FwButton, FwIcon, FwSectionLabel, FwTabs, FwTag, FwTextarea } from '@f-desk/ui'
+import { FwButton, FwIcon, FwSectionLabel, FwTabs, FwTag } from '@f-desk/ui'
 import { computed, nextTick, ref, useTemplateRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useToast } from '../../composables/useToast'
 import { useChatStore } from '../../stores/chat'
 import { useConversationsStore } from '../../stores/conversations'
 import { useSessionStore } from '../../stores/session'
+import ChatComposer from './ChatComposer.vue'
 import './chat.css'
 
 /**
@@ -112,13 +113,6 @@ async function send(text = draft.value) {
   if (chat.conversationId !== before || routeId.value !== chat.conversationId)
     await router.replace({ name: 'chat', params: { conversa: chat.conversationId } })
 }
-
-function onKeydown(event: KeyboardEvent) {
-  if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
-    event.preventDefault()
-    void send()
-  }
-}
 </script>
 
 <template>
@@ -196,44 +190,28 @@ function onKeydown(event: KeyboardEvent) {
       </div>
     </div>
 
-    <div class="chat-composer flex-none border-t border-line bg-bg px-4 py-4 sm:px-8">
+    <div class="flex-none bg-bg px-4 pt-2 pb-4 sm:px-8">
       <div class="mx-auto flex w-full max-w-3xl flex-col gap-2">
-        <!-- Campo e Enviar dividem a linha; o botão fica alinhado à base do campo. -->
-        <div class="flex items-end gap-2">
-          <div class="min-w-0 flex-1">
-            <FwTextarea
-              v-model="draft"
-              placeholder="Descreva o que está acontecendo…"
-              :max-length="CHAT_INPUT_MAX"
-              rows="2"
-              :error="chat.notice || undefined"
-              @keydown="onKeydown"
-            />
-          </div>
-          <FwButton
-            arrow
-            class="flex-none"
-            :disabled="chat.sending || !draft.trim()"
-            @click="send()"
-          >
-            {{ chat.sending ? 'Respondendo…' : 'Enviar' }}
-          </FwButton>
-        </div>
-        <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-          <p class="m-0 font-mono text-[11px] text-ink-muted">
-            Enter envia · Shift+Enter quebra a linha · não compartilhe senhas
-          </p>
-          <!-- Até o Wen propor o chamado sozinho (tarefa 13). -->
-          <FwButton
-            v-if="hasMessages && !session.isStaff"
-            :to="{ name: 'ticket-new' }"
-            variant="ghost"
-            size="sm"
-            icon-left="plus"
-          >
-            Abrir chamado
-          </FwButton>
-        </div>
+        <ChatComposer
+          v-model="draft"
+          :max-length="CHAT_INPUT_MAX"
+          :sending="chat.sending"
+          :error="chat.notice || undefined"
+          @submit="send()"
+        >
+          <template #actions>
+            <!-- Até o Wen propor o chamado sozinho (tarefa 13). -->
+            <FwButton
+              v-if="hasMessages && !session.isStaff"
+              :to="{ name: 'ticket-new' }"
+              variant="ghost"
+              size="sm"
+              icon-left="plus"
+            >
+              Abrir chamado
+            </FwButton>
+          </template>
+        </ChatComposer>
       </div>
     </div>
   </div>
