@@ -102,7 +102,13 @@ async function send(text = draft.value) {
   if (!ok || !chat.conversationId) return
   // Conversa gravada: a lista da sidebar sobe esta conversa e a URL passa a apontar para ela.
   const first = chat.messages.find((m) => m.role === 'user')?.content ?? message
-  conversations.touch({ id: chat.conversationId, firstQuestion: first })
+  conversations.touch({
+    id: chat.conversationId,
+    firstQuestion: first,
+    lastMessage: chat.messages.at(-1)?.content ?? message,
+    title: chat.meta?.title,
+    kind: chat.meta?.kind,
+  })
   if (chat.conversationId !== before || routeId.value !== chat.conversationId)
     await router.replace({ name: 'chat', params: { conversa: chat.conversationId } })
 }
@@ -191,29 +197,41 @@ function onKeydown(event: KeyboardEvent) {
     </div>
 
     <div class="chat-composer flex-none border-t border-line bg-bg px-4 py-4 sm:px-8">
-      <div class="mx-auto flex w-full max-w-3xl flex-col gap-3">
-        <FwTextarea
-          v-model="draft"
-          label="Sua mensagem"
-          placeholder="Descreva o que está acontecendo…"
-          :max-length="CHAT_INPUT_MAX"
-          rows="2"
-          :error="chat.notice || undefined"
-          hint="Enter envia; Shift+Enter quebra a linha. Não compartilhe senhas."
-          @keydown="onKeydown"
-        />
-        <div class="flex flex-wrap items-center justify-end gap-2">
+      <div class="mx-auto flex w-full max-w-3xl flex-col gap-2">
+        <!-- Campo e Enviar dividem a linha; o botão fica alinhado à base do campo. -->
+        <div class="flex items-end gap-2">
+          <div class="min-w-0 flex-1">
+            <FwTextarea
+              v-model="draft"
+              placeholder="Descreva o que está acontecendo…"
+              :max-length="CHAT_INPUT_MAX"
+              rows="2"
+              :error="chat.notice || undefined"
+              @keydown="onKeydown"
+            />
+          </div>
+          <FwButton
+            arrow
+            class="flex-none"
+            :disabled="chat.sending || !draft.trim()"
+            @click="send()"
+          >
+            {{ chat.sending ? 'Respondendo…' : 'Enviar' }}
+          </FwButton>
+        </div>
+        <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+          <p class="m-0 font-mono text-[11px] text-ink-muted">
+            Enter envia · Shift+Enter quebra a linha · não compartilhe senhas
+          </p>
           <!-- Até o Wen propor o chamado sozinho (tarefa 13). -->
           <FwButton
             v-if="hasMessages && !session.isStaff"
             :to="{ name: 'ticket-new' }"
             variant="ghost"
+            size="sm"
             icon-left="plus"
           >
             Abrir chamado
-          </FwButton>
-          <FwButton arrow :disabled="chat.sending || !draft.trim()" @click="send()">
-            {{ chat.sending ? 'Respondendo…' : 'Enviar' }}
           </FwButton>
         </div>
       </div>

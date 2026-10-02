@@ -3,6 +3,7 @@ import {
   CHAT_MESSAGE_MAX,
   type ChatMessage,
   type ChatReplySource,
+  type RequestKind,
 } from '@f-desk/shared'
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
@@ -55,6 +56,8 @@ export const useChatStore = defineStore('chat', () => {
   const notice = ref('')
   /** Conversa salva sendo aberta pela sidebar. */
   const loading = ref(false)
+  /** Título e tipo dados pelo bot à conversa nova (para a lista da sidebar). */
+  const meta = ref<{ title: string; kind: RequestKind | null } | null>(null)
 
   /** Carrega a conversa salva. A de outra conta é descartada; a do visitante segue após o login. */
   function hydrate(userId: string | null) {
@@ -114,6 +117,7 @@ export const useChatStore = defineStore('chat', () => {
           if (event.conversationId && !conversationId.value && messages.value.length > 2)
             partial.value = true
           if (event.conversationId) conversationId.value = event.conversationId
+          if (event.title) meta.value = { title: event.title, kind: event.kind ?? null }
           reply.pending = false
         } else {
           reply.content = event.message
@@ -152,6 +156,7 @@ export const useChatStore = defineStore('chat', () => {
       source: m.source ?? undefined,
     }))
     conversationId.value = data.id
+    meta.value = data.title ? { title: data.title, kind: data.kind } : null
     partial.value = false
     notice.value = ''
     return true
@@ -160,6 +165,7 @@ export const useChatStore = defineStore('chat', () => {
   function reset() {
     messages.value = []
     conversationId.value = undefined
+    meta.value = null
     partial.value = false
     notice.value = ''
   }
@@ -181,6 +187,7 @@ export const useChatStore = defineStore('chat', () => {
     sending,
     notice,
     loading,
+    meta,
     transcript,
     ticketAttachment,
     hydrate,

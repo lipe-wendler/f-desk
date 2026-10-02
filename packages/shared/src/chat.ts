@@ -1,3 +1,4 @@
+import type { RequestKind } from './request-kind'
 import { z } from 'zod'
 import { chatMessageSchema, type ChatSource } from './tickets'
 
@@ -28,7 +29,13 @@ export type ChatReplySource = ChatSource | 'fallback'
 export type ChatEvent =
   | { type: 'start'; source: ChatReplySource; faqId?: string }
   | { type: 'delta'; text: string }
-  | { type: 'end'; conversationId?: string }
+  | {
+      type: 'end'
+      conversationId?: string
+      /** Título e tipo da conversa, quando ela acabou de ser criada no servidor. */
+      title?: string
+      kind?: RequestKind | null
+    }
   | { type: 'error'; message: string }
 
 export const CHAT_FALLBACK_REPLY =

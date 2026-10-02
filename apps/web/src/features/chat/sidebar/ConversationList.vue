@@ -1,14 +1,17 @@
 <script setup lang="ts">
 import { FwButton } from '@f-desk/ui'
-import { computed, onBeforeUnmount, onMounted, useTemplateRef } from 'vue'
+import { onBeforeUnmount, onMounted, useTemplateRef } from 'vue'
 import { useConversationsStore } from '../../../stores/conversations'
-import { formatWhen, groupByRecency } from './recency'
+import KindBadge from './KindBadge.vue'
+import { formatSince } from './recency'
 
-/** Conversas salvas do cliente, agrupadas por recência, com scroll próprio e carga por página. */
+/**
+ * Conversas salvas do cliente, da mais recente para a mais antiga: título dado pelo bot, última
+ * mensagem, tempo desde a última interação e o tipo. Scroll próprio e carga por página.
+ */
 const props = defineProps<{ activeId?: string }>()
 const conversations = useConversationsStore()
 
-const groups = computed(() => groupByRecency(conversations.items))
 const sentinel = useTemplateRef<HTMLElement>('sentinel')
 let observer: IntersectionObserver | undefined
 
@@ -59,33 +62,33 @@ const isActive = (id: string) => id === props.activeId
     </div>
 
     <template v-else>
-      <section v-for="group in groups" :key="group.id" class="flex flex-col gap-1 pb-3">
-        <h3
-          class="m-0 px-2 py-1 font-mono text-[11px] font-normal tracking-[0.16em] text-ink-muted uppercase"
-        >
-          {{ group.label }}
-        </h3>
-        <ul class="m-0 flex list-none flex-col gap-0.5 p-0">
-          <li v-for="item in group.items" :key="item.id">
-            <RouterLink
-              :to="{ name: 'chat', params: { conversa: item.id } }"
-              :aria-current="isActive(item.id) ? 'page' : undefined"
-              class="sidebar-item"
-            >
-              <span class="min-w-0 flex-1 truncate">
-                {{ item.firstQuestion || 'Conversa sem título' }}
+      <ul class="m-0 flex list-none flex-col gap-1 p-0">
+        <li v-for="item in conversations.items" :key="item.id">
+          <RouterLink
+            :to="{ name: 'chat', params: { conversa: item.id } }"
+            :aria-current="isActive(item.id) ? 'page' : undefined"
+            class="sidebar-item"
+          >
+            <span class="flex items-baseline gap-2">
+              <span class="min-w-0 flex-1 truncate font-semibold">
+                {{ item.title || item.firstQuestion || 'Conversa sem título' }}
               </span>
-              <span v-if="item.ticketCode" class="sidebar-badge">{{ item.ticketCode }}</span>
               <time
                 :datetime="item.updatedAt"
                 class="flex-none font-mono text-[11px] text-ink-muted"
               >
-                {{ formatWhen(item.updatedAt) }}
+                {{ formatSince(item.updatedAt) }}
               </time>
-            </RouterLink>
-          </li>
-        </ul>
-      </section>
+            </span>
+            <span class="flex items-center gap-2">
+              <span class="min-w-0 flex-1 truncate text-sm text-ink-muted">
+                {{ item.lastMessage }}
+              </span>
+              <KindBadge v-if="item.kind" :kind="item.kind" />
+            </span>
+          </RouterLink>
+        </li>
+      </ul>
       <div ref="sentinel" aria-hidden="true" class="h-px" />
       <FwButton
         v-if="conversations.hasMore"

@@ -1,4 +1,4 @@
-import type { ConversationSummary } from '@f-desk/shared'
+import type { ConversationSummary, RequestKind } from '@f-desk/shared'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { conversationsApi } from '../features/tickets/tickets-api'
@@ -57,24 +57,41 @@ export const useConversationsStore = defineStore('conversations', () => {
 
   /**
    * Mantém a lista em dia depois de uma troca no chat, sem nova requisição: a conversa sobe para o
-   * topo (ou entra nela, se for nova). Com busca ativa a lista é um filtro e fica como está.
+   * topo com a última mensagem (ou entra nela, se for nova). Com busca ativa a lista é um filtro e
+   * fica como está.
    */
-  function touch({ id, firstQuestion }: { id: string; firstQuestion: string }) {
+  function touch(change: {
+    id: string
+    firstQuestion: string
+    lastMessage: string
+    title?: string
+    kind?: RequestKind | null
+  }) {
     if (query.value) return
     const now = new Date().toISOString()
-    const current = items.value.find((c) => c.id === id)
+    const current = items.value.find((c) => c.id === change.id)
     const updated: ConversationSummary = current
-      ? { ...current, updatedAt: now, messageCount: current.messageCount + 2 }
+      ? {
+          ...current,
+          updatedAt: now,
+          messageCount: current.messageCount + 2,
+          lastMessage: change.lastMessage,
+          title: current.title ?? change.title ?? null,
+          kind: current.kind ?? change.kind ?? null,
+        }
       : {
-          id,
+          id: change.id,
           createdAt: now,
           updatedAt: now,
-          firstQuestion,
+          title: change.title ?? null,
+          kind: change.kind ?? null,
+          lastMessage: change.lastMessage,
+          firstQuestion: change.firstQuestion,
           messageCount: 2,
           ticketCode: null,
         }
     if (!current) total.value += 1
-    items.value = [updated, ...items.value.filter((c) => c.id !== id)]
+    items.value = [updated, ...items.value.filter((c) => c.id !== change.id)]
   }
 
   function reset() {

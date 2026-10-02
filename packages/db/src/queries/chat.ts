@@ -1,3 +1,4 @@
+import type { RequestKind } from '@f-desk/shared'
 import { and, eq, sql } from 'drizzle-orm'
 import { db } from '../client'
 import { chatRateLimit, conversation, conversationMessage } from '../schema'
@@ -32,13 +33,21 @@ export interface ChatExchange {
   userId: string
   question: string
   reply: { content: string; source: 'faq' | 'llm' | null }
+  /** Título e tipo dados pelo bot. Só preenchem a conversa que ainda não tem (a primeira troca vale). */
+  meta?: { title: string; kind: RequestKind | null }
 }
 
 /**
  * Grava a pergunta e a resposta do chat de um usuário logado (num `batch`, que é transacional
  * no driver HTTP). Devolve o id da conversa.
  */
-export async function saveChatExchange({ conversationId, userId, question, reply }: ChatExchange) {
+export async function saveChatExchange({
+  conversationId,
+  userId,
+  question,
+  reply,
+  meta,
+}: ChatExchange) {
   let id = conversationId
   if (id) {
     const [own] = await db
@@ -62,11 +71,25 @@ export async function saveChatExchange({ conversationId, userId, question, reply
   ])
 
   if (isNew) {
-    await db.batch([db.insert(conversation).values({ id: targetId, userId }), messages])
+    await db.batch([
+      db
+        .insert(conversation)
+        .values({ id: targetId, userId, title: meta?.title ?? null, kind: meta?.kind ?? null }),
+      messages,
+    ])
   } else {
     await db.batch([
       messages,
-      db.update(conversation).set({ updatedAt: new Date() }).where(eq(conversation.id, targetId)),
+      db
+        .update(conversation)
+        .set({
+          updatedAt: new Date(),
+          ...(meta && {
+            title: sql`coalesce(${conversation.title}, ${meta.title})`,
+            kind: sql`coalesce(${conversation.kind}, ${meta.kind})`,
+          }),
+        })
+        .where(eq(conversation.id, targetId)),
     ])
   }
   return targetId

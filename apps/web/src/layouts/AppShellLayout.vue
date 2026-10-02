@@ -40,7 +40,7 @@ watch(
 </script>
 
 <template>
-  <div class="grid h-dvh overflow-hidden bg-bg lg:grid-cols-[280px_minmax(0,1fr)]">
+  <div class="grid h-dvh overflow-hidden bg-bg lg:grid-cols-[320px_minmax(0,1fr)]">
     <aside
       aria-label="Conversas"
       class="hidden min-h-0 border-r border-line bg-surface lg:flex lg:flex-col"

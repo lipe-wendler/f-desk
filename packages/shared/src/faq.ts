@@ -1,3 +1,5 @@
+import type { RequestKind } from './request-kind'
+
 /**
  * Base de respostas prontas da Wen (primeiro nível do atendimento).
  * A API compara a mensagem com `patterns`; o web mostra `question` como sugestão por categoria.
@@ -12,6 +14,8 @@ export type FaqCategory = (typeof FAQ_CATEGORIES)[number]['id']
 export interface FaqEntry {
   id: string
   category: FaqCategory
+  /** Tipo de solicitação da conversa que começa por esta resposta (selo na lista de conversas). */
+  kind: RequestKind
   /** Pergunta exibida como sugestão. */
   question: string
   /** Frases e palavras-chave que levam a esta resposta (comparadas sem acento e sem maiúsculas). */
@@ -26,6 +30,7 @@ export const FAQ: FaqEntry[] = [
   {
     id: 'abrir-chamado',
     category: 'question',
+    kind: 'question',
     question: 'Como abro um chamado?',
     patterns: [
       'abrir chamado',
@@ -41,6 +46,7 @@ export const FAQ: FaqEntry[] = [
   {
     id: 'acompanhar-chamado',
     category: 'question',
+    kind: 'question',
     question: 'Como acompanho meu chamado?',
     patterns: [
       'acompanhar chamado',
@@ -55,6 +61,7 @@ export const FAQ: FaqEntry[] = [
   {
     id: 'criar-conta',
     category: 'question',
+    kind: 'access',
     question: 'Preciso de uma conta para ser atendido?',
     patterns: ['criar conta', 'preciso de conta', 'cadastro', 'cadastrar', 'sem conta'],
     answer:
@@ -63,6 +70,7 @@ export const FAQ: FaqEntry[] = [
   {
     id: 'senha-forte',
     category: 'question',
+    kind: 'access',
     question: 'Como crio uma senha segura?',
     patterns: ['senha segura', 'senha forte', 'criar senha', 'boa senha', 'gerenciador de senhas'],
     answer:
@@ -71,6 +79,7 @@ export const FAQ: FaqEntry[] = [
   {
     id: 'verificacao-duas-etapas',
     category: 'question',
+    kind: 'access',
     question: 'O que é verificação em duas etapas?',
     patterns: [
       'verificacao em duas etapas',
@@ -86,6 +95,7 @@ export const FAQ: FaqEntry[] = [
   {
     id: 'email-celular',
     category: 'question',
+    kind: 'integration',
     question: 'Como configuro meu e-mail no celular?',
     patterns: [
       'configurar email no celular',
@@ -101,6 +111,7 @@ export const FAQ: FaqEntry[] = [
   {
     id: 'backup',
     category: 'question',
+    kind: 'data',
     question: 'Como faço backup dos meus arquivos?',
     patterns: ['backup', 'copia de seguranca', 'salvar arquivos', 'onedrive', 'google drive'],
     answer:
@@ -109,6 +120,7 @@ export const FAQ: FaqEntry[] = [
   {
     id: 'phishing',
     category: 'question',
+    kind: 'question',
     question: 'Recebi um e-mail suspeito. O que faço?',
     patterns: [
       'email suspeito',
@@ -124,6 +136,7 @@ export const FAQ: FaqEntry[] = [
   {
     id: 'compartilhar-arquivos',
     category: 'question',
+    kind: 'data',
     question: 'Como envio um arquivo grande?',
     patterns: [
       'arquivo grande',
@@ -138,6 +151,7 @@ export const FAQ: FaqEntry[] = [
   {
     id: 'atualizacoes',
     category: 'question',
+    kind: 'question',
     question: 'Preciso instalar as atualizações do sistema?',
     patterns: [
       'atualizacoes',
@@ -152,6 +166,7 @@ export const FAQ: FaqEntry[] = [
   {
     id: 'instalar-programa',
     category: 'question',
+    kind: 'question',
     question: 'Posso instalar qualquer programa?',
     patterns: ['instalar programa', 'instalar software', 'baixar programa', 'instalar aplicativo'],
     answer:
@@ -160,6 +175,7 @@ export const FAQ: FaqEntry[] = [
   {
     id: 'dados-chamado',
     category: 'question',
+    kind: 'question',
     question: 'Que informações ajudam o técnico?',
     patterns: [
       'informacoes para o tecnico',
@@ -176,6 +192,7 @@ export const FAQ: FaqEntry[] = [
   {
     id: 'sem-acesso-conta',
     category: 'problem',
+    kind: 'access',
     question: 'Não consigo entrar na minha conta',
     patterns: [
       'nao consigo entrar',
@@ -192,6 +209,7 @@ export const FAQ: FaqEntry[] = [
   {
     id: 'email-nao-envia',
     category: 'problem',
+    kind: 'bug',
     question: 'Meu e-mail não envia ou não recebe',
     patterns: [
       'email nao envia',
@@ -208,6 +226,7 @@ export const FAQ: FaqEntry[] = [
   {
     id: 'internet-lenta',
     category: 'problem',
+    kind: 'bug',
     question: 'A internet está lenta ou caindo',
     patterns: [
       'internet lenta',
@@ -225,6 +244,7 @@ export const FAQ: FaqEntry[] = [
   {
     id: 'computador-lento',
     category: 'problem',
+    kind: 'bug',
     question: 'Meu computador está lento',
     patterns: [
       'computador lento',
@@ -240,6 +260,7 @@ export const FAQ: FaqEntry[] = [
   {
     id: 'impressora',
     category: 'problem',
+    kind: 'bug',
     question: 'A impressora não imprime',
     patterns: ['impressora', 'nao imprime', 'fila de impressao', 'papel preso'],
     answer:
@@ -249,6 +270,7 @@ export const FAQ: FaqEntry[] = [
   {
     id: 'programa-nao-abre',
     category: 'problem',
+    kind: 'bug',
     question: 'Um programa não abre ou fecha sozinho',
     patterns: [
       'programa nao abre',
@@ -265,6 +287,7 @@ export const FAQ: FaqEntry[] = [
   {
     id: 'tela-azul',
     category: 'problem',
+    kind: 'bug',
     question: 'O computador desliga sozinho ou mostra tela azul',
     patterns: [
       'tela azul',
@@ -280,6 +303,7 @@ export const FAQ: FaqEntry[] = [
   {
     id: 'audio-video-reuniao',
     category: 'problem',
+    kind: 'integration',
     question: 'Microfone ou câmera não funcionam na reunião',
     patterns: [
       'microfone',
@@ -297,6 +321,7 @@ export const FAQ: FaqEntry[] = [
   {
     id: 'vpn',
     category: 'problem',
+    kind: 'access',
     question: 'A VPN não conecta',
     patterns: ['vpn', 'vpn nao conecta', 'acesso remoto', 'rede da empresa'],
     answer:
@@ -306,6 +331,7 @@ export const FAQ: FaqEntry[] = [
   {
     id: 'arquivo-nao-abre',
     category: 'problem',
+    kind: 'data',
     question: 'Um arquivo não abre',
     patterns: [
       'arquivo nao abre',
@@ -321,6 +347,7 @@ export const FAQ: FaqEntry[] = [
   {
     id: 'celular-sincronizacao',
     category: 'problem',
+    kind: 'integration',
     question: 'Meu celular não sincroniza e-mail ou arquivos',
     patterns: [
       'celular nao sincroniza',
@@ -337,6 +364,7 @@ export const FAQ: FaqEntry[] = [
   {
     id: 'virus',
     category: 'problem',
+    kind: 'bug',
     question: 'Acho que meu computador está com vírus',
     patterns: [
       'virus',

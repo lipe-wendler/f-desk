@@ -35,6 +35,11 @@ Navegador ──► Vercel (mesmo domínio)
   3. A resposta chega em NDJSON (`ChatEvent` de `@f-desk/shared`), para o texto aparecer enquanto é gerado.
   - **Visitante:** a conversa fica só no navegador (`localStorage`). **Logado:** a API também grava
     pergunta e resposta em `conversation`/`conversation_message`, com a origem (`faq`/`llm`).
+  - **Título e tipo da conversa** (lista do atendimento), definidos na primeira troca gravada:
+    - resposta pronta: a pergunta do FAQ e o `kind` da entrada;
+    - LLM: uma chamada curta extra (`services/llm/meta.ts`, até 4 s), só na conversa nova, pede título e
+      tipo (`access`, `data`, `integration`, `question`, `bug`, `feature`);
+    - sem nada disso (ou se a chamada falhar), a primeira mensagem cortada.
   - Ao entrar na conta, a conversa do visitante segue no navegador e vai junto com o chamado
     (abertura de chamado na tarefa 5).
   - **Limite:** 20 mensagens a cada 10 minutos por conta ou por IP, contado no Postgres
@@ -48,8 +53,8 @@ Navegador ──► Vercel (mesmo domínio)
     origem), `POST /:code/messages` e `POST /:code/close`.
   - Resposta do cliente em `waiting_client` ou `resolved` volta o chamado para `in_progress`; `closed` só
     aceita leitura (409). O código `TKT-0001` é o identificador na URL.
-- **Conversas do cliente** (`/api/conversations`, só `client`): lista com a primeira pergunta e o último
-  chamado ligado (`q` busca no texto das mensagens, paginada por `page`/`pageSize`), e o detalhe com as
+- **Conversas do cliente** (`/api/conversations`, só `client`): lista com título, tipo, última mensagem,
+  primeira pergunta e o último chamado ligado (`q` busca no texto das mensagens, paginada por `page`/`pageSize`), e o detalhe com as
   mensagens. No atendimento, a sidebar lista as conversas por recência e `/atendimento/:conversa` abre
   uma delas; em `/conversas`, qualquer conversa pode virar chamado.
 
@@ -78,7 +83,7 @@ Schema em `packages/db/src/schema`; status, prioridades e papéis das mensagens 
 
 | Tabela                 | Campos principais                                                                                                                                                       |
 | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `conversation`         | id, user_id (nulo para visitante), created_at, updated_at                                                                                                               |
+| `conversation`         | id, user_id (nulo para visitante), title e kind (dados pelo bot; nulos nas antigas), created_at, updated_at                                                             |
 | `conversation_message` | id (sequencial, define a ordem), conversation_id, role (`user`/`assistant`), content, source (`faq`/`llm`, só do assistente), created_at                                |
 | `ticket`               | id, number + code (`TKT-0001`, gerados pelo banco), client_id, assignee_id, subject, description, status, priority, conversation_id, created/updated/resolved/closed_at |
 | `ticket_message`       | id (sequencial), ticket_id, author_id, content, internal (nota só da equipe), created_at                                                                                |

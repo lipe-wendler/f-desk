@@ -9,7 +9,7 @@ import { useChatStore } from '../../../stores/chat'
 import { useConversationsStore } from '../../../stores/conversations'
 import { useSessionStore, type SessionUser } from '../../../stores/session'
 import ChatPage from '../ChatPage.vue'
-import { formatWhen, groupByRecency, recencyOf } from '../sidebar/recency'
+import { formatSince } from '../sidebar/recency'
 
 vi.mock('../../../lib/auth-client', () => ({
   authClient: { getSession: vi.fn(), signOut: vi.fn() },
@@ -21,8 +21,24 @@ const ID_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
 const ID_B = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
 const NOW = new Date().toISOString()
 
-function summary(id: string, firstQuestion: string, updatedAt: string): ConversationSummary {
-  return { id, createdAt: updatedAt, updatedAt, firstQuestion, messageCount: 2, ticketCode: null }
+function summary(
+  id: string,
+  firstQuestion: string,
+  updatedAt: string,
+  extra: Partial<ConversationSummary> = {},
+): ConversationSummary {
+  return {
+    id,
+    createdAt: updatedAt,
+    updatedAt,
+    title: null,
+    kind: null,
+    lastMessage: null,
+    firstQuestion,
+    messageCount: 2,
+    ticketCode: null,
+    ...extra,
+  }
 }
 
 const json = (body: unknown, status = 200) =>
@@ -105,31 +121,16 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-describe('recência', () => {
+describe('tempo desde a última interação', () => {
   const now = new Date(2026, 9, 2, 10, 0)
+  const ago = (ms: number) => new Date(now.getTime() - ms).toISOString()
 
-  it('separa por dia de calendário', () => {
-    expect(recencyOf(new Date(2026, 9, 2, 0, 1).toISOString(), now)).toBe('today')
-    expect(recencyOf(new Date(2026, 9, 1, 23, 59).toISOString(), now)).toBe('yesterday')
-    expect(recencyOf(new Date(2026, 8, 26).toISOString(), now)).toBe('week')
-    expect(recencyOf(new Date(2026, 8, 25).toISOString(), now)).toBe('month')
-    expect(recencyOf(new Date(2026, 8, 2).toISOString(), now)).toBe('older')
-  })
-
-  it('agrupa na ordem e omite grupos vazios', () => {
-    const groups = groupByRecency(
-      [
-        summary(ID_A, 'hoje', new Date(2026, 9, 2, 9).toISOString()),
-        summary(ID_B, 'antiga', new Date(2026, 5, 1).toISOString()),
-      ],
-      now,
-    )
-    expect(groups.map((g) => g.label)).toEqual(['Hoje', 'Mais antigas'])
-  })
-
-  it('mostra a hora para hoje e a data para os outros dias', () => {
-    expect(formatWhen(new Date(2026, 9, 2, 9, 5).toISOString(), now)).toBe('09:05')
-    expect(formatWhen(new Date(2026, 8, 20).toISOString(), now)).toMatch(/20 de set/)
+  it('mostra minutos e horas até um dia, depois a data', () => {
+    expect(formatSince(ago(20 * 1000), now)).toBe('agora')
+    expect(formatSince(ago(4 * 60 * 1000), now)).toBe('há 4 minutos')
+    expect(formatSince(ago(3 * 60 * 60 * 1000), now)).toBe('há 3 horas')
+    expect(formatSince(new Date(2026, 9, 1, 9, 0).toISOString(), now)).toBe('01/10/2026')
+    expect(formatSince('', now)).toBe('')
   })
 })
 
@@ -149,16 +150,22 @@ describe('store das conversas', () => {
     expect(store.items.map((c) => c.id)).toEqual([ID_A, ID_B])
     expect(store.hasMore).toBe(false)
 
-    store.touch({ id: ID_B, firstQuestion: 'x' })
-    expect(store.items[0]!.id).toBe(ID_B)
-    store.touch({ id: 'novo', firstQuestion: 'Pergunta nova' })
-    expect(store.items[0]).toMatchObject({ id: 'novo', firstQuestion: 'Pergunta nova' })
+    store.touch({ id: ID_B, firstQuestion: 'x', lastMessage: 'Resolvido, obrigado.' })
+    expect(store.items[0]).toMatchObject({ id: ID_B, lastMessage: 'Resolvido, obrigado.' })
+    store.touch({
+      id: 'novo',
+      firstQuestion: 'Pergunta nova',
+      lastMessage: 'Resposta',
+      title: 'Título do bot',
+      kind: 'bug',
+    })
+    expect(store.items[0]).toMatchObject({ id: 'novo', title: 'Título do bot', kind: 'bug' })
     expect(store.total).toBe(3)
 
     await store.search('vpn')
     expect(listCalls(fetchMock).at(-1)!.searchParams.get('q')).toBe('vpn')
     const before = store.items.map((c) => c.id)
-    store.touch({ id: 'outra', firstQuestion: 'y' })
+    store.touch({ id: 'outra', firstQuestion: 'y', lastMessage: 'z' })
     // Com busca ativa a lista é um filtro e não muda.
     expect(store.items.map((c) => c.id)).toEqual(before)
   })
@@ -188,19 +195,33 @@ describe('sidebar do atendimento', () => {
     expect(sidebar(wrapper).text()).toContain('Nenhuma conversa ainda')
   })
 
-  it('cliente vê as conversas por grupo e a aberta marcada', async () => {
+  it('cliente vê título, última mensagem, tempo e tipo, com a aberta marcada', async () => {
     const today = new Date().toISOString()
     mockApi({
       list: () =>
         json({
-          conversations: [summary(ID_A, 'Impressora parou', today), summary(ID_B, 'VPN', today)],
+          conversations: [
+            summary(ID_A, 'Minha impressora parou de imprimir', today, {
+              title: 'Impressora não imprime',
+              kind: 'bug',
+              lastMessage: 'Funcionou, obrigado.',
+            }),
+            summary(ID_B, 'VPN', today),
+          ],
           total: 2,
         }),
       get: (id) => json({ id, createdAt: today, updatedAt: today, messages: [], tickets: [] }),
     })
     const { wrapper } = await mountShell(`/atendimento/${ID_B}`, client)
     const side = sidebar(wrapper)
-    expect(side.find('h3').text()).toBe('Hoje')
+    const first = side.get(`a[href="/atendimento/${ID_A}"]`)
+    expect(first.text()).toContain('Impressora não imprime')
+    expect(first.text()).not.toContain('Minha impressora parou')
+    expect(first.text()).toContain('Funcionou, obrigado.')
+    expect(first.text()).toContain('agora')
+    expect(first.text()).toContain('Bug')
+    // Conversa antiga sem título: usa a primeira pergunta.
+    expect(side.get(`a[href="/atendimento/${ID_B}"]`).text()).toContain('VPN')
     const current = side.findAll('a[aria-current="page"]')
     expect(current).toHaveLength(1)
     expect(current[0]!.text()).toContain('VPN')
@@ -283,7 +304,7 @@ describe('conversa aberta pela rota', () => {
         ndjson([
           { type: 'start', source: 'llm' },
           { type: 'delta', text: 'Vamos ver.' },
-          { type: 'end', conversationId: ID_B },
+          { type: 'end', conversationId: ID_B, title: 'Impressora parada', kind: 'bug' },
         ]),
       get: (id) => json({ id, createdAt: '', updatedAt: '', messages: [], tickets: [] }),
     })
@@ -296,7 +317,11 @@ describe('conversa aberta pela rota', () => {
     expect(useConversationsStore().items[0]).toMatchObject({
       id: ID_B,
       firstQuestion: 'Minha impressora parou',
+      title: 'Impressora parada',
+      kind: 'bug',
+      lastMessage: 'Vamos ver.',
     })
+    expect(sidebar(wrapper).text()).toContain('Impressora parada')
     // A conversa já estava no store: abrir a URL dela não recarrega do servidor.
     expect(wrapper.get('[data-testid="chat-messages"]').text()).toContain('Vamos ver.')
   })

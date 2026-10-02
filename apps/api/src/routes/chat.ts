@@ -3,6 +3,7 @@ import {
   CHAT_ERROR_REPLY,
   CHAT_FALLBACK_REPLY,
   chatRequestSchema,
+  fallbackTitle,
   fieldErrors,
   type ChatEvent,
   type ChatReplySource,
@@ -11,6 +12,7 @@ import type { LanguageModel } from 'ai'
 import { Hono } from 'hono'
 import type { AppEnv } from '../middleware/session'
 import { matchFaq } from '../services/faq/match'
+import { describeConversation, type ConversationMeta } from '../services/llm/meta'
 import { streamWenReply } from '../services/llm/reply'
 import { clientIp, quotaKey, type ConsumeQuota } from '../services/rate-limit'
 
@@ -21,6 +23,8 @@ export interface ChatDeps {
   saveExchange: (exchange: ChatExchange) => Promise<string>
   /** Segredo usado no hash do IP. */
   secret: string
+  /** Título e tipo da conversa nova pelo LLM (padrão: `describeConversation`). Injetável nos testes. */
+  describe?: typeof describeConversation
 }
 
 /**
@@ -81,20 +85,49 @@ export function createChatRoute(deps: ChatDeps) {
           return
         }
 
+        /**
+         * Título e tipo da conversa. Resposta pronta: a pergunta do FAQ. LLM: um resumo pedido ao
+         * modelo, só na conversa nova (uma chamada extra pequena). Sem nada disso, a própria mensagem.
+         */
+        async function conversationMeta(isNew: boolean): Promise<ConversationMeta | undefined> {
+          if (faq) return { title: faq.entry.question, kind: faq.entry.kind }
+          if (source === 'llm' && deps.model) {
+            if (!isNew) return undefined
+            const described = await (deps.describe ?? describeConversation)(deps.model, {
+              history,
+              message,
+              reply,
+            })
+            if (described) return described
+          }
+          return {
+            title: fallbackTitle(history.find((m) => m.role === 'user')?.content ?? message),
+            kind: null,
+          }
+        }
+
         let savedId: string | undefined
+        let meta: ConversationMeta | undefined
         if (user && reply.trim()) {
+          meta = await conversationMeta(!conversationId)
           try {
             savedId = await deps.saveExchange({
               conversationId,
               userId: user.id,
               question: message,
               reply: { content: reply, source: source === 'fallback' ? null : source },
+              meta,
             })
           } catch (error) {
             console.error('[chat] falha ao gravar a conversa', error)
           }
         }
-        send({ type: 'end', conversationId: savedId })
+        // Título e tipo só vão para a tela na conversa nova (numa existente o banco mantém os primeiros).
+        send(
+          savedId && meta && !conversationId
+            ? { type: 'end', conversationId: savedId, title: meta.title, kind: meta.kind }
+            : { type: 'end', conversationId: savedId },
+        )
         controller.close()
       },
     })

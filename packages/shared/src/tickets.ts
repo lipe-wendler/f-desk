@@ -1,3 +1,4 @@
+import type { RequestKind } from './request-kind'
 import { z } from 'zod'
 
 export const TICKET_STATUSES = [
@@ -171,6 +172,11 @@ export interface ConversationSummary {
   id: string
   createdAt: string
   updatedAt: string
+  /** Título gerado pelo bot (pergunta do FAQ ou resumo do LLM); nulo nas conversas antigas. */
+  title: string | null
+  kind: RequestKind | null
+  /** Última mensagem da conversa, de qualquer lado. */
+  lastMessage: string | null
   firstQuestion: string | null
   messageCount: number
   /** Último chamado aberto a partir da conversa. */
@@ -181,6 +187,8 @@ export interface ConversationDetail {
   id: string
   createdAt: string
   updatedAt: string
+  title: string | null
+  kind: RequestKind | null
   messages: (TranscriptMessage & { createdAt: string })[]
   tickets: { code: string; status: TicketStatus }[]
 }

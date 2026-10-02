@@ -3,9 +3,9 @@ import { CHAT_ERROR_REPLY, CHAT_FALLBACK_REPLY, findFaq, type ChatEvent } from '
 import { simulateReadableStream, type LanguageModel } from 'ai'
 import { MockLanguageModelV4 } from 'ai/test'
 import { Hono } from 'hono'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { AppEnv } from '../middleware/session'
-import { createChatRoute } from '../routes/chat'
+import { createChatRoute, type ChatDeps } from '../routes/chat'
 
 const usage = {
   inputTokens: { total: 3, noCache: 3, cacheRead: undefined, cacheWrite: undefined },
@@ -45,7 +45,12 @@ const failingModel = new MockLanguageModelV4({
 type User = NonNullable<AppEnv['Variables']['user']>
 
 function setup(
-  opts: { model?: LanguageModel | null; user?: Partial<User>; allowed?: boolean } = {},
+  opts: {
+    model?: LanguageModel | null
+    user?: Partial<User>
+    allowed?: boolean
+    describe?: ChatDeps['describe']
+  } = {},
 ) {
   const saved: ChatExchange[] = []
   const quotaKeys: string[] = []
@@ -60,6 +65,7 @@ function setup(
       return exchange.conversationId ?? '00000000-0000-4000-8000-000000000001'
     },
     secret: 'segredo-de-teste',
+    describe: opts.describe,
   })
   const app = new Hono<AppEnv>()
     .use('*', async (c, next) => {
@@ -163,9 +169,67 @@ describe('POST /chat', () => {
         userId: 'u1',
         question: 'Meu computador está lento',
         reply: { content: findFaq('computador-lento')!.answer, source: 'faq' },
+        // Resposta pronta: o título é a pergunta do FAQ e o tipo vem da entrada.
+        meta: {
+          title: findFaq('computador-lento')!.question,
+          kind: findFaq('computador-lento')!.kind,
+        },
       },
     ])
     expect(quotaKeys).toEqual(['user:u1'])
+  })
+
+  it('conversa nova pelo LLM ganha título e tipo gerados, que voltam no fim', async () => {
+    const { model } = streamingModel(['Vamos ver ', 'isso.'])
+    const describe = vi.fn<NonNullable<ChatDeps['describe']>>(async () => ({
+      title: 'Erro 503 ao exportar notas',
+      kind: 'bug',
+    }))
+    const { app, saved } = setup({ model, user: { id: 'u1' }, describe })
+    const { events } = await send(app, {
+      message: 'o sistema de notas fiscais mostra erro 503 ao exportar',
+    })
+    expect(describe).toHaveBeenCalledOnce()
+    expect(describe.mock.calls[0]![1]).toMatchObject({ reply: 'Vamos ver isso.' })
+    expect(saved[0]?.meta).toEqual({ title: 'Erro 503 ao exportar notas', kind: 'bug' })
+    expect(events.at(-1)).toEqual({
+      type: 'end',
+      conversationId: '00000000-0000-4000-8000-000000000001',
+      title: 'Erro 503 ao exportar notas',
+      kind: 'bug',
+    })
+  })
+
+  it('na conversa que já existe o LLM não é chamado de novo para o título', async () => {
+    const { model } = streamingModel(['ok'])
+    const describe = vi.fn()
+    const { app, saved } = setup({ model, user: { id: 'u1' }, describe })
+    const conversationId = '11111111-1111-4111-8111-111111111111'
+    const { events } = await send(app, {
+      message: 'o sistema de notas fiscais mostra erro 503',
+      conversationId,
+    })
+    expect(describe).not.toHaveBeenCalled()
+    expect(saved[0]?.meta).toBeUndefined()
+    expect(events.at(-1)).toEqual({ type: 'end', conversationId })
+  })
+
+  it('se o título do LLM falhar, usa a primeira mensagem', async () => {
+    const { model } = streamingModel(['ok'])
+    const { app, saved } = setup({ model, user: { id: 'u1' }, describe: async () => null })
+    await send(app, { message: 'o sistema de notas fiscais mostra erro 503' })
+    expect(saved[0]?.meta).toEqual({
+      title: 'o sistema de notas fiscais mostra erro 503',
+      kind: null,
+    })
+  })
+
+  it('visitante não gera título (a conversa não é gravada)', async () => {
+    const { model } = streamingModel(['ok'])
+    const describe = vi.fn()
+    const { app } = setup({ model, describe })
+    await send(app, { message: 'o sistema de notas fiscais mostra erro 503' })
+    expect(describe).not.toHaveBeenCalled()
   })
 
   it('grava a resposta sem origem quando é o aviso padrão', async () => {

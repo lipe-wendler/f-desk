@@ -147,7 +147,7 @@ export const landing = {
         text: 'Tira dúvidas a qualquer hora, abre chamado sem formulário e acompanha tudo numa tela.',
       },
       {
-        icon: 'settings',
+        icon: 'gear',
         title: 'Técnico',
         text: 'Recebe o caso com contexto, responde pelo painel e deixa notas internas para a equipe.',
       },

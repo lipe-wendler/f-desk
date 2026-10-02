@@ -221,6 +221,10 @@ export async function listConversations(params: {
   const ticketCode = sql<string | null>`(
     select t.code from ticket t where t.conversation_id = ${outerId}
     order by t.number desc limit 1)`
+  const lastMessage = sql<string | null>`(
+    select cm.content from conversation_message cm
+    where cm.conversation_id = ${outerId}
+    order by cm.id desc limit 1)`
 
   const filters: SQL[] = [eq(conversation.userId, params.userId)]
   const term = params.search?.trim()
@@ -237,6 +241,9 @@ export async function listConversations(params: {
         id: conversation.id,
         createdAt: conversation.createdAt,
         updatedAt: conversation.updatedAt,
+        title: conversation.title,
+        kind: conversation.kind,
+        lastMessage,
         firstQuestion,
         messageCount,
         ticketCode,
@@ -255,7 +262,7 @@ export async function listConversations(params: {
 export async function getConversation(userId: string, id: string) {
   const found = await db.query.conversation.findFirst({
     where: and(eq(conversation.id, id), eq(conversation.userId, userId)),
-    columns: { id: true, createdAt: true, updatedAt: true },
+    columns: { id: true, title: true, kind: true, createdAt: true, updatedAt: true },
     with: {
       messages: {
         orderBy: asc(conversationMessage.id),

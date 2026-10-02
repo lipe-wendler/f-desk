@@ -5,6 +5,7 @@ import {
   CHAT_SOURCES,
   DEFAULT_TICKET_PRIORITY,
   DEFAULT_TICKET_STATUS,
+  REQUEST_KIND_IDS,
   TICKET_PRIORITIES,
   TICKET_STATUSES,
 } from '@f-desk/shared'
@@ -33,17 +34,23 @@ const updatedAt = () =>
     .$onUpdate(() => /* @__PURE__ */ new Date())
     .notNull()
 
-/** Conversa com o chatbot. `user_id` nulo: visitante sem conta (a conversa fica só no navegador até virar chamado). */
+/**
+ * Conversa com o chatbot. `user_id` nulo: visitante sem conta (a conversa fica só no navegador até virar chamado).
+ * `title` e `kind` são definidos pelo bot na primeira troca gravada: a pergunta do FAQ ou o resumo do LLM.
+ */
 export const conversation = pgTable(
   'conversation',
   {
     id: uuid('id').primaryKey().defaultRandom(),
     userId: text('user_id').references(() => user.id, { onDelete: 'set null' }),
+    title: text('title'),
+    kind: text('kind', { enum: REQUEST_KIND_IDS }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (table) => [
     index('conversation_user_id_updated_at_idx').on(table.userId, table.updatedAt.desc()),
+    check('conversation_kind_check', oneOf(table.kind, REQUEST_KIND_IDS)),
   ],
 )
 
