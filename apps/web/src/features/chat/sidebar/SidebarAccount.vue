@@ -84,7 +84,7 @@ async function signOut() {
         @click="toggle()"
         @keydown.up.prevent="toggle(true)"
       >
-        <FwIcon name="settings" />
+        <FwIcon name="gear" />
       </button>
     </div>
 
