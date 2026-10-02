@@ -32,6 +32,9 @@ import { FwButton, FwInput } from '@f-desk/ui'
 - **Componentes Vue** (`Fw*`): `FwButton`, `FwIconButton`, `FwIcon`, `FwSectionLabel`, `FwInput`, `FwSelect`,
   `FwTextarea`, `FwCheckbox`, `FwRadio`, `FwSwitch`, `FwTag`, `FwTabs`, `FwMedia`, `FwListRow`, `FwStepper`,
   `FwMetricCard`, `FwFeatureCard`, `FwAppHeader`. Campos e seletores usam `v-model`.
+  `FwInput` com `type="password"` e `revealable` ganha o botão de mostrar/ocultar senha.
+- **Extensões do F.Desk**: `responsive.css` (ajustes de celular) e `extensions.css` (peças criadas aqui,
+  como o botão de senha) ficam separados para o `components.css` continuar igual à fonte.
 - **Só CSS**: os módulos de landing do design system (`fw-hero`, `fw-module`, `fw-quote-*`, `fw-principle`,
   cards de projeto) continuam em `components.css`, mas não ganharam componente Vue porque o helpdesk não os usa.
 

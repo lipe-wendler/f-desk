@@ -1,0 +1,38 @@
+/* Componentes e variações criados no F.Desk sobre o design system F.Wendler.
+   Mantidos aqui para que components.css continue igual à fonte. */
+
+/* FwInput revealable: botão de mostrar/ocultar senha dentro do campo. */
+.fw-control-reveal .fw-input {
+  padding-right: 48px;
+}
+.fw-reveal {
+  position: absolute;
+  right: 4px;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink-muted);
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease;
+}
+.fw-reveal:hover {
+  color: var(--ink);
+  background: var(--surface-raised);
+}
+.fw-reveal:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.fw-reveal .fw-icon {
+  position: static;
+  width: 18px;
+  height: 18px;
+  color: inherit;
+}

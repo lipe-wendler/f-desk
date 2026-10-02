@@ -62,3 +62,28 @@ describe('FwInput', () => {
     expect(w.emitted('update:modelValue')?.[0]).toEqual(['cliente@exemplo.com'])
   })
 })
+
+describe('FwInput revealable', () => {
+  it('alterna entre password e text', async () => {
+    const w = mount(FwInput, {
+      props: { label: 'Senha', revealable: true },
+      attrs: { type: 'password' },
+    })
+    const toggle = w.find('button.fw-reveal')
+    expect(w.find('input').attributes('type')).toBe('password')
+    expect(toggle.attributes('aria-label')).toBe('Mostrar senha')
+    await toggle.trigger('click')
+    expect(w.find('input').attributes('type')).toBe('text')
+    expect(toggle.attributes('aria-pressed')).toBe('true')
+    expect(toggle.attributes('aria-label')).toBe('Ocultar senha')
+  })
+
+  it('não mostra o botão fora de campos de senha', () => {
+    const w = mount(FwInput, {
+      props: { label: 'E-mail', revealable: true },
+      attrs: { type: 'email' },
+    })
+    expect(w.find('button.fw-reveal').exists()).toBe(false)
+    expect(w.find('input').attributes('type')).toBe('email')
+  })
+})
