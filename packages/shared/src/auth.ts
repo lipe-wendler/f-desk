@@ -12,30 +12,34 @@ export const ROLE_LABEL: Record<Role, string> = {
 }
 
 // Normaliza antes de validar: espaços e maiúsculas não podem gerar contas duplicadas.
-const email = z
+export const emailField = z
   .string()
   .trim()
   .toLowerCase()
   .pipe(z.email({ error: 'Informe um e-mail válido.' }))
 
+export const nameField = z
+  .string()
+  .trim()
+  .min(2, { error: 'Informe o nome.' })
+  .max(80, { error: 'Use no máximo 80 caracteres.' })
+
+export const passwordField = z
+  .string()
+  .min(PASSWORD_MIN, { error: `A senha precisa ter ${PASSWORD_MIN} caracteres ou mais.` })
+  .max(PASSWORD_MAX, { error: `A senha pode ter no máximo ${PASSWORD_MAX} caracteres.` })
+
 export const signInSchema = z.object({
-  email,
+  email: emailField,
   password: z.string().min(1, { error: 'Informe sua senha.' }),
 })
 export type SignInInput = z.infer<typeof signInSchema>
 
 export const signUpSchema = z
   .object({
-    name: z
-      .string()
-      .trim()
-      .min(2, { error: 'Informe seu nome.' })
-      .max(80, { error: 'Use no máximo 80 caracteres.' }),
-    email,
-    password: z
-      .string()
-      .min(PASSWORD_MIN, { error: `A senha precisa ter ${PASSWORD_MIN} caracteres ou mais.` })
-      .max(PASSWORD_MAX, { error: `A senha pode ter no máximo ${PASSWORD_MAX} caracteres.` }),
+    name: nameField,
+    email: emailField,
+    password: passwordField,
     confirmPassword: z.string(),
   })
   .refine((data) => data.password === data.confirmPassword, {
