@@ -1,4 +1,4 @@
-export { default as FwAppHeader } from './components/FwAppHeader.vue'
+export { default as FwAppHeader, type FwAppHeaderLink } from './components/FwAppHeader.vue'
 export { default as FwButton } from './components/FwButton.vue'
 export { default as FwCheckbox } from './components/FwCheckbox.vue'
 export { default as FwDialog } from './components/FwDialog.vue'

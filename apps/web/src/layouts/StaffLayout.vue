@@ -9,7 +9,7 @@ import { useSessionStore } from '../stores/session'
 const session = useSessionStore()
 
 const links = computed(() => [
-  { label: 'Chamados', to: '/tecnico' },
+  { label: 'Chamados', to: '/tecnico', match: '/tecnico' },
   ...(session.user?.role === 'admin' ? [{ label: 'Usuários', to: '/admin/usuarios' }] : []),
 ])
 </script>
