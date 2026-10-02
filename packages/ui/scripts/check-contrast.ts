@@ -7,8 +7,8 @@ const UI = 3
 
 /** [frente, fundos, mínimo] */
 const PAIRS: [string, string[], number][] = [
-  ['ink', ['bg', 'surface', 'surface-raised', 'field'], TEXT],
-  ['ink-muted', ['bg', 'surface', 'surface-raised', 'field'], TEXT],
+  ['ink', ['bg', 'surface', 'surface-raised', 'field', 'accent-soft'], TEXT],
+  ['ink-muted', ['bg', 'surface', 'surface-raised', 'field', 'accent-soft'], TEXT],
   ['accent-text', ['bg', 'surface', 'accent-soft'], TEXT],
   ['on-accent', ['accent', 'accent-hover'], TEXT],
   ['success', ['bg', 'surface'], TEXT],
@@ -16,6 +16,14 @@ const PAIRS: [string, string[], number][] = [
   ['on-danger', ['danger'], TEXT],
   ['line-strong', ['bg', 'surface', 'surface-raised', 'field'], UI],
   ['focus', ['bg', 'surface', 'surface-raised'], UI],
+  // Selos de tipo de solicitação (lista de conversas).
+  ...(['red', 'blue', 'purple', 'green', 'orange', 'pink'] as const).map(
+    (k): [string, string[], number] => [
+      `kind-${k}`,
+      [`kind-${k}-soft`, 'surface', 'surface-raised'],
+      TEXT,
+    ],
+  ),
 ]
 
 function luminance(hex: string): number {

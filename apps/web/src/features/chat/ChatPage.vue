@@ -1,13 +1,25 @@
 <script setup lang="ts">
 import { CHAT_INPUT_MAX, FAQ, FAQ_CATEGORIES, type FaqCategory } from '@f-desk/shared'
-import { FwButton, FwSectionLabel, FwTabs, FwTag, FwTextarea } from '@f-desk/ui'
+import { FwButton, FwIcon, FwSectionLabel, FwTabs, FwTag } from '@f-desk/ui'
 import { computed, nextTick, ref, useTemplateRef, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { useToast } from '../../composables/useToast'
 import { useChatStore } from '../../stores/chat'
+import { useConversationsStore } from '../../stores/conversations'
 import { useSessionStore } from '../../stores/session'
+import ChatComposer from './ChatComposer.vue'
+import './chat.css'
 
-/** Chatbot público: qualquer visitante tira dúvidas sem conta. Abrir chamado exige login. */
+/**
+ * Chatbot público: qualquer visitante tira dúvidas sem conta. A página ocupa a altura da tela e só
+ * a lista de mensagens rola. Do cliente, `/atendimento/:conversa` abre uma conversa salva.
+ */
 const chat = useChatStore()
 const session = useSessionStore()
+const conversations = useConversationsStore()
+const route = useRoute()
+const router = useRouter()
+const toast = useToast()
 
 const draft = ref('')
 const category = ref<FaqCategory>(FAQ_CATEGORIES[0].id)
@@ -17,6 +29,9 @@ const list = useTemplateRef<HTMLElement>('list')
 
 const isClient = computed(() => session.user?.role === 'client')
 const hasMessages = computed(() => chat.messages.length > 0)
+const routeId = computed(() =>
+  typeof route.params.conversa === 'string' ? route.params.conversa : undefined,
+)
 
 watch(
   () => session.user?.id ?? null,
@@ -24,12 +39,55 @@ watch(
   { immediate: true },
 )
 
-// Acompanha a resposta enquanto ela chega.
+/** Rota e conversa aberta andam juntas: o id na URL abre a conversa; a conversa salva ganha URL. */
+watch(
+  [routeId, isClient],
+  async ([id, client]) => {
+    if (!client) return
+    if (id && id !== chat.conversationId) {
+      const ok = await chat.loadConversation(id)
+      if (!ok) {
+        toast.show('Conversa não encontrada.', 'danger')
+        await router.replace({ name: 'chat' })
+      }
+      return
+    }
+    if (!id && chat.conversationId && !chat.sending)
+      await router.replace({ name: 'chat', params: { conversa: chat.conversationId } })
+  },
+  { immediate: true },
+)
+
+// ---- Scroll: acompanha a resposta só se a pessoa já está no fim da conversa.
+const NEAR_BOTTOM = 80
+const atBottom = ref(true)
+
+function onScroll() {
+  const el = list.value
+  if (!el) return
+  atBottom.value = el.scrollHeight - el.scrollTop - el.clientHeight <= NEAR_BOTTOM
+}
+
+function scrollToEnd() {
+  list.value?.scrollTo({ top: list.value.scrollHeight })
+  atBottom.value = true
+}
+
 watch(
   () => chat.messages.map((m) => m.content.length).join(),
   async () => {
+    if (!atBottom.value) return
     await nextTick()
-    list.value?.scrollTo({ top: list.value.scrollHeight })
+    scrollToEnd()
+  },
+)
+
+// Conversa trocada (sidebar, nova conversa): começa do fim.
+watch(
+  () => chat.conversationId,
+  async () => {
+    await nextTick()
+    scrollToEnd()
   },
 )
 
@@ -37,47 +95,46 @@ async function send(text = draft.value) {
   const message = text.trim()
   if (!message || chat.sending) return
   draft.value = ''
+  const before = chat.conversationId
+  // Quem manda mensagem quer ver a resposta.
+  atBottom.value = true
   const ok = await chat.send(message)
   if (!ok && !draft.value) draft.value = message
-}
-
-function onKeydown(event: KeyboardEvent) {
-  if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
-    event.preventDefault()
-    void send()
-  }
+  if (!ok || !chat.conversationId) return
+  // Conversa gravada: a lista da sidebar sobe esta conversa e a URL passa a apontar para ela.
+  const first = chat.messages.find((m) => m.role === 'user')?.content ?? message
+  conversations.touch({
+    id: chat.conversationId,
+    firstQuestion: first,
+    lastMessage: chat.messages.at(-1)?.content ?? message,
+    title: chat.meta?.title,
+    kind: chat.meta?.kind,
+  })
+  if (chat.conversationId !== before || routeId.value !== chat.conversationId)
+    await router.replace({ name: 'chat', params: { conversa: chat.conversationId } })
 }
 </script>
 
 <template>
-  <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-    <section
-      class="flex min-h-[480px] flex-col gap-6 rounded-lg border border-line bg-surface p-6 shadow-card sm:p-8"
-    >
-      <div class="flex flex-col gap-3">
-        <FwSectionLabel bar>Atendimento</FwSectionLabel>
-        <h1
-          class="m-0 font-display text-[32px] leading-10 font-semibold tracking-[-0.015em] sm:text-[48px] sm:leading-[56px] sm:font-bold"
-        >
-          Como posso <span class="fw-hl">ajudar?</span>
-        </h1>
-        <p class="m-0 max-w-[56ch] text-ink-muted">
-          Wen, assistente de suporte da F.Wendler, responde às dúvidas mais comuns na hora. Se o
-          caso precisar de um técnico, você abre um chamado e acompanha tudo por aqui.
-        </p>
-      </div>
-
+  <div class="flex min-h-0 flex-1 flex-col">
+    <div v-if="hasMessages" class="relative flex min-h-0 flex-1 flex-col">
       <div
-        v-if="hasMessages"
         ref="list"
-        class="flex max-h-[60vh] flex-col gap-4 overflow-y-auto pr-1"
+        role="log"
+        aria-label="Mensagens da conversa"
         aria-live="polite"
+        class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-6 sm:px-8"
         data-testid="chat-messages"
+        @scroll.passive="onScroll"
       >
+        <h1 class="sr-only">Atendimento</h1>
         <div
           v-for="m in chat.messages"
           :key="m.id"
-          :class="['flex flex-col gap-1', m.role === 'user' ? 'items-end' : 'items-start']"
+          :class="[
+            'mx-auto flex w-full max-w-3xl flex-col gap-1',
+            m.role === 'user' ? 'items-end' : 'items-start',
+          ]"
         >
           <span class="font-mono text-[12px] tracking-[0.16em] text-ink-muted uppercase">
             {{ m.role === 'user' ? 'Você' : 'Wen' }}
@@ -95,57 +152,67 @@ function onKeydown(event: KeyboardEvent) {
           </p>
         </div>
       </div>
+      <button
+        v-if="!atBottom"
+        type="button"
+        class="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-pill border border-line-strong bg-surface px-4 py-2 text-sm font-semibold text-ink shadow-pop focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+        @click="scrollToEnd"
+      >
+        <FwIcon name="chevron-down" size="sm" />Ir para o fim
+      </button>
+    </div>
 
-      <div v-else class="flex flex-col gap-3">
-        <FwTabs v-model="category" :items="tabs" label="Tipo de atendimento" variant="neutral" />
-        <div class="flex flex-wrap gap-2">
-          <FwTag v-for="s in suggestions" :key="s.id" clickable @click="send(s.question)">
-            {{ s.question }}
-          </FwTag>
-        </div>
-      </div>
-
-      <div class="mt-auto flex flex-col gap-3">
-        <FwTextarea
-          v-model="draft"
-          label="Sua mensagem"
-          placeholder="Descreva o que está acontecendo…"
-          :max-length="CHAT_INPUT_MAX"
-          :error="chat.notice || undefined"
-          hint="Enter envia; Shift+Enter quebra a linha. Não compartilhe senhas."
-          @keydown="onKeydown"
-        />
-        <div class="flex flex-wrap items-center justify-end gap-2">
-          <FwButton
-            v-if="hasMessages"
-            variant="ghost"
-            :disabled="chat.sending"
-            @click="chat.reset()"
+    <div v-else class="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-8 sm:px-8">
+      <div class="mx-auto flex w-full max-w-3xl flex-col gap-6">
+        <div class="flex flex-col gap-3">
+          <FwSectionLabel bar>Atendimento</FwSectionLabel>
+          <h1
+            class="m-0 font-display text-[32px] leading-10 font-semibold tracking-[-0.015em] sm:text-[44px] sm:leading-[52px] sm:font-bold"
           >
-            Nova conversa
-          </FwButton>
-          <FwButton arrow :disabled="chat.sending || !draft.trim()" @click="send()">
-            {{ chat.sending ? 'Respondendo…' : 'Enviar' }}
-          </FwButton>
+            Como posso <span class="fw-hl">ajudar?</span>
+          </h1>
+          <p class="m-0 max-w-[56ch] text-ink-muted">
+            Wen, assistente de suporte da F.Wendler, responde às dúvidas mais comuns na hora. Se o
+            caso precisar de um técnico, você abre um chamado e acompanha tudo por aqui.
+          </p>
+        </div>
+        <p v-if="chat.loading" class="m-0 text-sm text-ink-muted" role="status">
+          Abrindo a conversa…
+        </p>
+        <div v-else class="flex flex-col gap-3">
+          <FwTabs v-model="category" :items="tabs" label="Tipo de atendimento" variant="neutral" />
+          <div class="flex flex-wrap gap-2">
+            <FwTag v-for="s in suggestions" :key="s.id" clickable @click="send(s.question)">
+              {{ s.question }}
+            </FwTag>
+          </div>
         </div>
       </div>
-    </section>
+    </div>
 
-    <aside class="flex flex-col gap-4 rounded-lg border border-line bg-surface p-6 shadow-card">
-      <FwSectionLabel>Precisa de um técnico?</FwSectionLabel>
-      <p class="m-0 text-sm text-ink-muted">
-        <template v-if="isClient">
-          Abra um chamado e um técnico acompanha o seu caso. Esta conversa vai junto.
-        </template>
-        <template v-else>
-          Para abrir um chamado e ver o histórico das suas conversas e chamados, entre na sua conta.
-          Criar uma conta leva menos de um minuto, e esta conversa vai junto.
-        </template>
-      </p>
-      <FwButton :to="{ name: 'ticket-new' }" icon-left="plus">Abrir chamado</FwButton>
-      <FwButton v-if="!session.user" :to="{ name: 'sign-up' }" variant="secondary">
-        Criar conta
-      </FwButton>
-    </aside>
+    <div class="flex-none bg-bg px-4 pt-2 pb-4 sm:px-8">
+      <div class="mx-auto flex w-full max-w-3xl flex-col gap-2">
+        <ChatComposer
+          v-model="draft"
+          :max-length="CHAT_INPUT_MAX"
+          :sending="chat.sending"
+          :error="chat.notice || undefined"
+          @submit="send()"
+        >
+          <template #actions>
+            <!-- Até o Wen propor o chamado sozinho (tarefa 13). -->
+            <FwButton
+              v-if="hasMessages && !session.isStaff"
+              :to="{ name: 'ticket-new' }"
+              variant="ghost"
+              size="sm"
+              icon-left="plus"
+            >
+              Abrir chamado
+            </FwButton>
+          </template>
+        </ChatComposer>
+      </div>
+    </div>
   </div>
 </template>

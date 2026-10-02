@@ -12,6 +12,8 @@ export interface ConversationStore {
 const listQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(50).default(20),
+  /** Busca no texto das mensagens (sidebar do atendimento). */
+  q: z.string().trim().max(100).optional(),
 })
 
 const NOT_FOUND = { error: 'Conversa não encontrada.' }
@@ -23,11 +25,12 @@ export function createConversationsRoute(store: ConversationStore) {
     .get('/', async (c) => {
       const parsed = listQuerySchema.safeParse(c.req.query())
       if (!parsed.success) return c.json({ error: 'Parâmetros inválidos.' }, 400)
-      const { page, pageSize } = parsed.data
+      const { page, pageSize, q } = parsed.data
       const result = await store.list({
         userId: c.get('user')!.id,
         limit: pageSize,
         offset: (page - 1) * pageSize,
+        ...(q ? { search: q } : {}),
       })
       return c.json(result)
     })

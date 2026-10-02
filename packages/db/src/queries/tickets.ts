@@ -202,8 +202,13 @@ export async function closeClientTicket(
   return { ok: true }
 }
 
-/** Conversas do usuário com a Wen, da mais recente para a mais antiga. */
-export async function listConversations(params: { userId: string; limit: number; offset: number }) {
+/** Conversas do usuário com a Wen, da mais recente para a mais antiga. `search` procura no texto das mensagens. */
+export async function listConversations(params: {
+  userId: string
+  limit: number
+  offset: number
+  search?: string
+}) {
   // SQL escrito à mão de propósito: numa consulta de uma tabela só, o Drizzle omite o nome da tabela
   // nas colunas, e dentro destas subconsultas `"id"` passaria a ser o id da outra tabela.
   const outerId = sql.raw('"conversation"."id"')
@@ -216,14 +221,29 @@ export async function listConversations(params: { userId: string; limit: number;
   const ticketCode = sql<string | null>`(
     select t.code from ticket t where t.conversation_id = ${outerId}
     order by t.number desc limit 1)`
+  const lastMessage = sql<string | null>`(
+    select cm.content from conversation_message cm
+    where cm.conversation_id = ${outerId}
+    order by cm.id desc limit 1)`
 
-  const where = eq(conversation.userId, params.userId)
+  const filters: SQL[] = [eq(conversation.userId, params.userId)]
+  const term = params.search?.trim()
+  if (term) {
+    const pattern = `%${term.replace(/[\\%_]/g, (c) => `\\${c}`)}%`
+    filters.push(sql`exists (
+      select 1 from conversation_message cm
+      where cm.conversation_id = ${outerId} and cm.content ilike ${pattern})`)
+  }
+  const where = and(...filters)
   const [rows, [totalRow]] = await Promise.all([
     db
       .select({
         id: conversation.id,
         createdAt: conversation.createdAt,
         updatedAt: conversation.updatedAt,
+        title: conversation.title,
+        kind: conversation.kind,
+        lastMessage,
         firstQuestion,
         messageCount,
         ticketCode,
@@ -242,7 +262,7 @@ export async function listConversations(params: { userId: string; limit: number;
 export async function getConversation(userId: string, id: string) {
   const found = await db.query.conversation.findFirst({
     where: and(eq(conversation.id, id), eq(conversation.userId, userId)),
-    columns: { id: true, createdAt: true, updatedAt: true },
+    columns: { id: true, title: true, kind: true, createdAt: true, updatedAt: true },
     with: {
       messages: {
         orderBy: asc(conversationMessage.id),

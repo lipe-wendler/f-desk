@@ -32,9 +32,13 @@ export const ticketsApi = {
 }
 
 export const conversationsApi = {
-  list: (page: number, pageSize: number) =>
-    apiFetch<{ conversations: ConversationSummary[]; total: number }>(
-      `/conversations?${new URLSearchParams({ page: String(page), pageSize: String(pageSize) })}`,
-    ),
+  /** `q` busca no texto das mensagens. */
+  list: (page: number, pageSize: number, q?: string) => {
+    const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
+    if (q?.trim()) params.set('q', q.trim())
+    return apiFetch<{ conversations: ConversationSummary[]; total: number }>(
+      `/conversations?${params}`,
+    )
+  },
   get: (id: string) => apiFetch<ConversationDetail>(`/conversations/${encodeURIComponent(id)}`),
 }

@@ -23,6 +23,18 @@
   --color-success: var(--success);
   --color-danger: var(--danger);
   --color-on-danger: var(--on-danger);
+  --color-kind-red: var(--kind-red);
+  --color-kind-red-soft: var(--kind-red-soft);
+  --color-kind-blue: var(--kind-blue);
+  --color-kind-blue-soft: var(--kind-blue-soft);
+  --color-kind-purple: var(--kind-purple);
+  --color-kind-purple-soft: var(--kind-purple-soft);
+  --color-kind-green: var(--kind-green);
+  --color-kind-green-soft: var(--kind-green-soft);
+  --color-kind-orange: var(--kind-orange);
+  --color-kind-orange-soft: var(--kind-orange-soft);
+  --color-kind-pink: var(--kind-pink);
+  --color-kind-pink-soft: var(--kind-pink-soft);
   --color-transparent: transparent;
   --color-current: currentColor;
 

@@ -8,6 +8,8 @@ export interface SessionUser {
   name: string
   email: string
   role: Role
+  /** Foto de perfil (campo `image` do better-auth); sem ela, o avatar usa as iniciais. */
+  image?: string | null
 }
 
 /** Sessão do usuário logado (ou null para visitantes). */
@@ -21,7 +23,9 @@ export const useSessionStore = defineStore('session', () => {
       const { data } = await authClient.getSession()
       const u = data?.user
       user.value =
-        u && isRole(u.role) ? { id: u.id, name: u.name, email: u.email, role: u.role } : null
+        u && isRole(u.role)
+          ? { id: u.id, name: u.name, email: u.email, role: u.role, image: u.image ?? null }
+          : null
     } catch {
       user.value = null
     }

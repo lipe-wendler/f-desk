@@ -1,0 +1,100 @@
+/* Sidebar do atendimento e o drawer do celular. Só tokens. */
+
+.sidebar-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  color: var(--ink);
+  font: 400 14px/20px var(--font-sans);
+  text-decoration: none;
+}
+.sidebar-item:hover {
+  background: var(--surface-raised);
+}
+/* Conversa aberta: o amarelo suave da marca, como no print de referência. */
+.sidebar-item[aria-current='page'] {
+  background: var(--accent-soft);
+}
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  font: 500 14px/20px var(--font-sans);
+  text-decoration: none;
+}
+.sidebar-link:hover {
+  background: var(--surface-raised);
+}
+.sidebar-link .fw-icon {
+  color: var(--ink-muted);
+}
+
+.sidebar-icon-btn {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+.sidebar-icon-btn:hover,
+.sidebar-icon-btn[aria-expanded='true'] {
+  background: var(--surface-raised);
+  color: var(--ink);
+}
+
+.sidebar-menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink);
+  font: 400 14px/20px var(--font-sans);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.sidebar-menu-item:hover,
+.sidebar-menu-item:focus-visible {
+  background: var(--surface-raised);
+  outline: none;
+}
+
+.sidebar-item:focus-visible,
+.sidebar-link:focus-visible,
+.sidebar-icon-btn:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+/* Drawer do celular sobre o <dialog> nativo: prende o foco e fecha com Esc. */
+.shell-drawer {
+  width: min(320px, 88vw);
+  max-width: none;
+  height: 100dvh;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-right: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+}
+.shell-drawer::backdrop {
+  background: color-mix(in srgb, var(--bg) 70%, transparent);
+}
