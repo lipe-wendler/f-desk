@@ -9,7 +9,9 @@ import ThemeToggle from '../components/ThemeToggle.vue'
       <ThemeToggle />
     </div>
     <main class="flex flex-1 flex-col justify-center pb-16">
-      <RouterView />
+      <div class="rounded-lg border border-line bg-surface p-6 shadow-card sm:p-8">
+        <RouterView />
+      </div>
     </main>
   </div>
 </template>

@@ -1,23 +1,17 @@
 <script setup lang="ts">
-import { FwAppHeader, FwIconButton, FwTag } from '@f-desk/ui'
+import { FwAppHeader } from '@f-desk/ui'
 import { computed } from 'vue'
-import { useRouter } from 'vue-router'
 import ThemeToggle from '../components/ThemeToggle.vue'
+import UserMenu from '../components/UserMenu.vue'
 import { useSessionStore } from '../stores/session'
 
 /** Layout do técnico e do admin: dashboard de chamados e gestão de usuários. */
 const session = useSessionStore()
-const router = useRouter()
 
 const links = computed(() => [
   { label: 'Chamados', to: '/tecnico' },
   ...(session.user?.role === 'admin' ? [{ label: 'Usuários', to: '/admin/usuarios' }] : []),
 ])
-
-async function signOut() {
-  await session.signOut()
-  await router.push({ name: 'sign-in' })
-}
 </script>
 
 <template>
@@ -25,10 +19,7 @@ async function signOut() {
     <FwAppHeader :links="links" home-to="/tecnico">
       <template #actions>
         <ThemeToggle />
-        <FwTag v-if="session.user" size="sm" system class="max-sm:hidden">{{
-          session.user.role
-        }}</FwTag>
-        <FwIconButton icon="log-out" label="Sair" size="sm" @click="signOut" />
+        <UserMenu />
       </template>
     </FwAppHeader>
     <main class="flex-1">
