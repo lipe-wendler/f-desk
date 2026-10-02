@@ -15,5 +15,6 @@ describe('entrada da Vercel (api/index.js)', () => {
     const res: Response = await entry.GET(new Request('https://f-desk.vercel.app/api/health'))
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({ ok: true })
-  })
+    // Importar o bundle (~3 MB) leva ~3 s sozinho e mais com o turbo rodando outros pacotes.
+  }, 30_000)
 })

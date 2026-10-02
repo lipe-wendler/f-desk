@@ -1,5 +1,5 @@
 import { createAccessControl } from 'better-auth/plugins/access'
-import { adminAc, defaultStatements } from 'better-auth/plugins/admin/access'
+import { defaultStatements } from 'better-auth/plugins/admin/access'
 
 /**
  * Permissões por perfil. `user` e `session` são os recursos do plugin admin do
@@ -20,8 +20,11 @@ export const technician = ac.newRole({
   ticket: ['read', 'update', 'assign'],
 })
 
+// Só o que a gestão de usuários usa: sem personificar (`impersonate`) nem apagar contas
+// (`delete`) — contas são desativadas para manter o histórico de chamados.
 export const admin = ac.newRole({
-  ...adminAc.statements,
+  user: ['create', 'list', 'get', 'update', 'set-role', 'ban', 'set-password'],
+  session: ['list', 'revoke'],
   ticket: ['read', 'update', 'assign'],
 })
 

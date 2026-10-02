@@ -3,6 +3,7 @@ import { DEFAULT_ROLE, PASSWORD_MAX, PASSWORD_MIN } from '@f-desk/shared'
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { admin } from 'better-auth/plugins'
+import { adminGuard } from './auth/admin-guard'
 import { ac, roles } from './auth/permissions'
 import { env, trustedOrigins } from './env'
 
@@ -30,6 +31,9 @@ export const auth = betterAuth({
   advanced: {
     // Na Vercel, `x-real-ip` é definido pela borda com o IP real do visitante.
     ipAddress: { ipAddressHeaders: ['x-real-ip', 'x-forwarded-for'] },
+  },
+  hooks: {
+    before: adminGuard,
   },
   plugins: [
     admin({

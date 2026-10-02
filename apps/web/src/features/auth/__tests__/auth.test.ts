@@ -186,3 +186,14 @@ describe('SignUpPage', () => {
     expect(alert.find('a').attributes('href')).toBe('/entrar?redirect=/chamados/novo')
   })
 })
+
+describe('erros por campo', () => {
+  it('somem quando o campo é corrigido', async () => {
+    const { wrapper } = await mountAt(SignInPage, '/entrar')
+    await wrapper.find('form').trigger('submit')
+    expect(wrapper.text()).toContain('Informe um e-mail válido.')
+    await wrapper.find('input[type="email"]').setValue('ana@exemplo.com')
+    expect(wrapper.text()).not.toContain('Informe um e-mail válido.')
+    expect(wrapper.text()).toContain('Informe sua senha.')
+  })
+})

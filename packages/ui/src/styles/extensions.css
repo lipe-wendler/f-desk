@@ -36,3 +36,100 @@
   height: 18px;
   color: inherit;
 }
+
+/* FwDialog: modal sobre o <dialog> nativo. O reset do Tailwind zera a margin; `margin: auto`
+   devolve a centralização do <dialog> modal. */
+.fw-dialog {
+  margin: auto;
+  width: min(560px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-pop);
+  overflow: auto;
+}
+.fw-dialog-sm {
+  width: min(440px, calc(100vw - 32px));
+}
+.fw-dialog::backdrop {
+  background: rgba(10, 10, 9, 0.6);
+}
+.fw-dialog-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-6);
+}
+.fw-dialog-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+.fw-dialog-titles {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.fw-dialog-title {
+  margin: 0;
+  font: 600 24px/32px var(--font-display);
+  letter-spacing: -0.01em;
+}
+.fw-dialog-desc {
+  margin: 0;
+  font: 400 14px/20px var(--font-sans);
+  color: var(--ink-muted);
+}
+.fw-dialog-close {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+.fw-dialog-close:hover {
+  background: var(--surface-raised);
+  color: var(--ink);
+}
+.fw-dialog-close:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.fw-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.fw-dialog-foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+@media (max-width: 640px) {
+  .fw-dialog-panel {
+    padding: var(--space-5);
+  }
+  .fw-dialog-foot > * {
+    flex: 1;
+  }
+}
+
+/* FwButton variant="danger": ações destrutivas (desativar acesso). */
+.fw-btn-danger {
+  background: var(--danger);
+  color: var(--on-danger);
+}
+.fw-btn-danger:hover:not(:disabled) {
+  filter: brightness(1.08);
+}

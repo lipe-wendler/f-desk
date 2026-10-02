@@ -20,8 +20,8 @@ Sistema de tickets da F.Wendler. Leia `README.md` e `docs/arquitetura.md` antes 
 
 - UI: componentes `Fw*` de `@f-desk/ui` e utilitários Tailwind ligados aos tokens. Nunca escreva hex.
   Mudou `tokens.json`? Rode `pnpm --filter @f-desk/ui tokens` e `check:contrast`.
-- Perfis: `client` (cadastro próprio), `technician` e `admin` (criados pelo admin). Regras de acesso
-  sempre na API (`requireRole`); o router do web só espelha.
+- Perfis: `client` (cadastro próprio), `technician` e `admin` (criados pelo admin em `/admin/usuarios`).
+  Regras de acesso sempre na API (`requireRole`, `auth/admin-guard.ts`); o router do web só espelha.
 - Textos da interface em português do Brasil; voz da marca no `packages/ui/README.md`.
 - Schema do banco em `packages/db/src/schema`; mudou? `pnpm db:generate` e versione a migration.
 
