@@ -8,8 +8,9 @@ const router = createRouter({ history: createMemoryHistory(), routes })
 const check = (path: string, role?: Role) => resolveAccess(router.resolve(path), role)
 
 describe('acesso às rotas por perfil', () => {
-  it('visitante usa o chat e as telas de login sem conta', () => {
+  it('visitante vê a landing, usa o chat e as telas de login sem conta', () => {
     expect(check('/')).toBe(true)
+    expect(check('/atendimento')).toBe(true)
     expect(check('/entrar')).toBe(true)
     expect(check('/criar-conta')).toBe(true)
   })
@@ -40,6 +41,14 @@ describe('acesso às rotas por perfil', () => {
   it('admin acessa dashboard e gestão de usuários', () => {
     expect(check('/tecnico', 'admin')).toBe(true)
     expect(check('/admin/usuarios', 'admin')).toBe(true)
+  })
+
+  it('a landing fica em / e o atendimento em /atendimento, abertos a qualquer perfil', () => {
+    expect(router.resolve('/').name).toBe('landing')
+    expect(router.resolve('/atendimento').name).toBe('chat')
+    expect(check('/', 'client')).toBe(true)
+    expect(check('/', 'technician')).toBe(true)
+    expect(check('/atendimento', 'client')).toBe(true)
   })
 
   it('usuário logado que abre entrar/criar conta vai para a página inicial do perfil', () => {

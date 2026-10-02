@@ -1,0 +1,468 @@
+/* Landing page: só o que o design system não cobre. Cores, raios e fontes sempre pelos tokens. */
+
+/* Âncoras e foco não ficam escondidos atrás do topo fixo (WCAG 2.4.11). */
+html:has(.landing-shell) {
+  scroll-padding-top: 104px;
+}
+
+.landing-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  max-width: var(--container);
+  margin: 0 auto;
+  padding: 0 var(--space-4);
+}
+@media (min-width: 640px) {
+  .landing-shell {
+    padding: 0 var(--space-5);
+  }
+}
+
+/* Pular para o conteúdo: escondido até receber foco. */
+.landing-skip {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  z-index: 50;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: var(--on-accent);
+  font: 600 14px/20px var(--font-sans);
+  text-decoration: none;
+  transform: translateY(-200%);
+}
+.landing-skip:focus-visible {
+  transform: none;
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Topo fixo: o fundo cobre o conteúdo que passa por baixo. */
+.landing-header-wrap {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  padding: var(--space-4) 0;
+  background: var(--bg);
+}
+.landing-header {
+  position: relative;
+}
+.landing-mobile-menu {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-pop);
+}
+.landing-mobile-link {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  font: 500 16px/24px var(--font-sans);
+  text-decoration: none;
+}
+.landing-mobile-link:hover,
+.landing-mobile-link:focus-visible {
+  background: var(--surface-raised);
+}
+
+.landing-main {
+  flex: 1;
+  outline: none;
+}
+
+.landing-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding: var(--space-8) 0 0;
+}
+.landing-title {
+  margin: 0;
+  font: 700 40px/46px var(--font-display);
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+.landing-label {
+  font: 400 11px/16px var(--font-mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+/* Hero: texto à esquerda, mock do chat à direita e a faixa de palavras embaixo. */
+.landing-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: var(--space-6);
+  align-items: center;
+  padding: var(--space-7);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+.landing-hero-copy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+.landing-hero-title {
+  margin: 0;
+  font: 700 56px/62px var(--font-display);
+  letter-spacing: -0.025em;
+}
+.landing-hero-words {
+  grid-column: 1 / -1;
+}
+
+/* Mock da conversa no hero. */
+.landing-preview-window {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+  box-shadow: var(--shadow-pop);
+}
+.landing-preview-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+.landing-bubble {
+  max-width: 85%;
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  font: 400 14px/20px var(--font-sans);
+}
+.landing-bubble-user {
+  align-self: flex-end;
+  border-bottom-right-radius: var(--radius-sm);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.landing-bubble-bot {
+  border-bottom-left-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  color: var(--ink);
+}
+.landing-ticket {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-width: 85%;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line-strong);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  font-size: 14px;
+}
+
+/* Faixa de palavras: anima em loop e para com o botão ou com prefers-reduced-motion. */
+.landing-marquee {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
+}
+.landing-marquee-viewport {
+  flex: 1;
+  overflow: hidden;
+  mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
+}
+.landing-marquee-track {
+  display: flex;
+  width: max-content;
+  animation: landing-marquee 28s linear infinite;
+}
+.landing-marquee.is-paused .landing-marquee-track {
+  animation-play-state: paused;
+}
+.landing-marquee-list {
+  display: flex;
+  gap: var(--space-7);
+  margin: 0;
+  padding: 0 var(--space-7) 0 0;
+  list-style: none;
+  font: 400 12px/16px var(--font-mono);
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+.landing-marquee-list li::after {
+  content: '·';
+  margin-left: var(--space-7);
+  color: var(--accent-text);
+}
+@keyframes landing-marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .landing-marquee-track {
+    animation: none;
+  }
+  .landing-marquee-toggle {
+    display: none;
+  }
+}
+
+/* Como funciona: passos numerados. */
+.landing-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.landing-step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-5);
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--accent);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+.landing-step-num {
+  font: 700 12px/16px var(--font-mono);
+  letter-spacing: 0.08em;
+  color: var(--accent-text);
+}
+
+/* Citação. */
+.landing-quote {
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-7) var(--space-6);
+  text-align: center;
+}
+.landing-quote .fw-quote-text {
+  max-width: 32ch;
+  font-size: 28px;
+  line-height: 36px;
+  text-wrap: balance;
+}
+
+/* Dúvidas: <details> nativo, acessível por teclado sem script. */
+.landing-faq {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--line);
+}
+.landing-faq-item {
+  border-bottom: 1px solid var(--line);
+}
+.landing-faq-item summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  min-height: 56px;
+  padding: var(--space-3) 0;
+  font: 600 17px/24px var(--font-sans);
+  cursor: pointer;
+  list-style: none;
+}
+.landing-faq-item summary::-webkit-details-marker {
+  display: none;
+}
+.landing-faq-item summary:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+.landing-faq-item[open] .landing-faq-icon {
+  transform: rotate(180deg);
+}
+.landing-faq-item p {
+  max-width: 68ch;
+  padding-bottom: var(--space-5);
+}
+
+/* CTA final. */
+.landing-cta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-5);
+  padding: var(--space-8) var(--space-6);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  text-align: center;
+}
+
+/* Planos. */
+.landing-billing {
+  display: inline-flex;
+  align-self: flex-start;
+  gap: var(--space-1);
+  margin: 0;
+  padding: var(--space-1);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+}
+.landing-billing-option {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-pill);
+  color: var(--ink-muted);
+  font: 600 14px/20px var(--font-sans);
+  cursor: pointer;
+}
+.landing-billing-option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.landing-billing-option:has(input:checked) {
+  background: var(--surface-raised);
+  color: var(--ink);
+}
+.landing-billing-option:has(input:focus-visible) {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.landing-billing-badge {
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font: 700 11px/16px var(--font-mono);
+  white-space: nowrap;
+}
+
+.landing-plans {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+  align-items: stretch;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.landing-plan {
+  gap: var(--space-4);
+  padding: var(--space-6);
+}
+.landing-plan-featured {
+  border: 2px solid var(--accent);
+}
+.landing-plan-badge {
+  align-self: flex-start;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--on-accent);
+  font: 700 11px/16px var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.landing-plan-price {
+  margin: 0;
+}
+.landing-plan-value {
+  font: 700 40px/44px var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+.landing-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-5);
+  margin-top: var(--space-8);
+  padding: var(--space-6) 0 var(--space-7);
+  border-top: 1px solid var(--line);
+}
+.landing-footer a {
+  color: var(--ink);
+  text-decoration: none;
+}
+.landing-footer a:hover {
+  text-decoration: underline;
+}
+
+/* Até 1024px as âncoras vão para o menu (não cabem com os botões do topo). */
+@media (max-width: 1023px) {
+  .landing-header .fw-nav {
+    display: none;
+  }
+  .landing-header .fw-header-actions {
+    margin-left: auto;
+  }
+}
+
+/* Tablet e celular. */
+@media (max-width: 960px) {
+  .landing-hero {
+    grid-template-columns: minmax(0, 1fr);
+    padding: var(--space-6);
+  }
+  .landing-plans {
+    grid-template-columns: minmax(0, 1fr);
+    max-width: 480px;
+  }
+  /* O plano em destaque aparece primeiro. */
+  .landing-plan-featured {
+    order: -1;
+  }
+}
+@media (max-width: 640px) {
+  .landing-hero {
+    padding: var(--space-5);
+  }
+  .landing-hero-title {
+    font-size: 38px;
+    line-height: 44px;
+  }
+  .landing-title {
+    font-size: 30px;
+    line-height: 36px;
+  }
+  .landing-section {
+    padding-top: var(--space-7);
+  }
+  .landing .fw-metric-value {
+    font-size: 40px;
+    line-height: 44px;
+  }
+  .landing-cta {
+    padding: var(--space-7) var(--space-5);
+  }
+  .landing-billing {
+    align-self: stretch;
+  }
+  .landing-billing-option {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+}

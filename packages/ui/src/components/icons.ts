@@ -76,6 +76,8 @@ export const ICONS = {
     'M6.6 6.7C4.1 8.4 2.5 12 2.5 12s3.5 6.5 9.5 6.5c1.9 0 3.5-.6 4.9-1.5',
     'M9.9 9.9a3 3 0 0 0 4.2 4.2',
   ],
+  pause: ['M9 5v14', 'M15 5v14'],
+  play: ['M7 5l12 7-12 7z'],
 } as const satisfies Record<string, readonly string[]>
 
 export type IconName = keyof typeof ICONS
