@@ -1,29 +1,22 @@
 <script setup lang="ts">
 import { ROLE_LABEL } from '@f-desk/shared'
 import { FwIcon, FwTag } from '@f-desk/ui'
-import { computed, nextTick, onBeforeUnmount, ref, useTemplateRef, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { computed, useTemplateRef } from 'vue'
+import { useRouter } from 'vue-router'
+import { useDropdownMenu } from '../composables/useDropdownMenu'
+import { initialsOf } from '../lib/initials'
 import { useSessionStore } from '../stores/session'
 
 /** Menu do usuário logado: identificação, atalhos do perfil e sair. */
 const session = useSessionStore()
 const router = useRouter()
-const route = useRoute()
 
-const open = ref(false)
 const root = useTemplateRef<HTMLElement>('root')
 const trigger = useTemplateRef<HTMLButtonElement>('trigger')
-const panel = useTemplateRef<HTMLElement>('panel')
+const { open, toggle, close, moveFocus } = useDropdownMenu(root, trigger)
 
 const user = computed(() => session.user)
-const initials = computed(() =>
-  (user.value?.name ?? '')
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]!.toUpperCase())
-    .join(''),
-)
+const initials = computed(() => initialsOf(user.value?.name ?? ''))
 
 const links = computed(() => {
   switch (user.value?.role) {
@@ -43,44 +36,6 @@ const links = computed(() => {
       return []
   }
 })
-
-function items(): HTMLElement[] {
-  return Array.from(panel.value?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])
-}
-
-async function toggle(focusFirst = false) {
-  open.value = !open.value
-  if (open.value && focusFirst) {
-    await nextTick()
-    items()[0]?.focus()
-  }
-}
-
-function close(returnFocus = false) {
-  if (!open.value) return
-  open.value = false
-  if (returnFocus) trigger.value?.focus()
-}
-
-function moveFocus(delta: number) {
-  const list = items()
-  const index = list.indexOf(document.activeElement as HTMLElement)
-  list[(index + delta + list.length) % list.length]?.focus()
-}
-
-function onDocumentClick(event: MouseEvent) {
-  if (!root.value?.contains(event.target as Node)) close()
-}
-
-watch(open, (value) => {
-  if (value) document.addEventListener('click', onDocumentClick)
-  else document.removeEventListener('click', onDocumentClick)
-})
-watch(
-  () => route.fullPath,
-  () => close(),
-)
-onBeforeUnmount(() => document.removeEventListener('click', onDocumentClick))
 
 async function signOut() {
   close()
@@ -114,7 +69,6 @@ async function signOut() {
     <div
       v-show="open"
       id="user-menu"
-      ref="panel"
       role="menu"
       aria-label="Menu do usuário"
       class="absolute top-[calc(100%+8px)] right-0 z-20 flex w-64 flex-col gap-1 rounded-md border border-line bg-surface p-2 shadow-pop"

@@ -4,6 +4,7 @@ import { FwButton, FwInput, FwSectionLabel } from '@f-desk/ui'
 import { computed, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import FormAlert from '../../components/FormAlert.vue'
+import { useFieldErrors } from '../../composables/useFieldErrors'
 import { authClient } from '../../lib/auth-client'
 import { homeFor } from '../../router/access'
 import { safeRedirect } from '../../router/redirect'
@@ -16,7 +17,7 @@ const router = useRouter()
 const session = useSessionStore()
 
 const form = reactive({ name: '', email: '', password: '', confirmPassword: '' })
-const errors = ref<Record<string, string>>({})
+const errors = useFieldErrors(form)
 const formError = ref('')
 const accountExists = ref(false)
 const submitting = ref(false)
