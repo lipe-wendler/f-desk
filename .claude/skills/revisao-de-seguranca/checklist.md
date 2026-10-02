@@ -72,3 +72,19 @@ vem de um achado real ou de uma garantia que o projeto já tem e não pode perde
 
 - [ ] Regra de acesso nova tem teste (401 visitante, 403 perfil errado, 404 recurso de outra pessoa),
       no padrão de `apps/api/src/__tests__/security.test.ts`.
+
+## 9. Ferramentas do processo
+
+Vale quando o diff toca `.claude/**`, `.husky/**`, `.github/workflows/**`, `.mcp.json`,
+`commitlint.config.js` ou `CLAUDE.md`. Hooks do Claude Code e do Git rodam na máquina de quem abre o
+projeto.
+
+- [ ] Hook (Claude Code ou Git) não executa nem interpola texto vindo de fora (`tool_input`,
+      `tool_response`, mensagem de commit, nome de branch) e não faz chamada de rede. **(bloqueia)**
+- [ ] Nada enfraquece a revisão: o auditor continua só de leitura, o veredito segue a regra de
+      severidade, a skill continua sendo chamada após abrir PR, o pre-push e o CI não perdem
+      checagens. **(bloqueia)**
+- [ ] Permissão nova em `.claude/settings.json` (`allow`) ou MCP novo em `.mcp.json` tem motivo
+      escrito no PR; nada de liberar escrita ampla (`Bash(*)`, ferramentas de escrita de MCP).
+- [ ] Workflow do GitHub novo não usa `pull_request_target` com checkout do código do PR, não expõe
+      segredo em log e fixa as actions por versão.

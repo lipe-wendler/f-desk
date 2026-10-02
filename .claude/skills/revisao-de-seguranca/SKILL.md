@@ -17,6 +17,9 @@ Argumento: `$ARGUMENTS` (número do PR; vazio = branch atual contra a `main`).
 - **Com número de PR:** leia o PR (`mcp__github__pull_request_read`, repositório
   `lipe-wendler/f-desk`) para saber a branch de origem. Depois
   `git fetch origin main <branch-do-pr>` e use o diff `origin/main...origin/<branch-do-pr>`.
+  O auditor lê arquivos do checkout: se a branch atual não for a do PR (ou estiver diferente de
+  `origin/<branch-do-pr>`), avise no prompt que ele deve ler os arquivos com
+  `git show origin/<branch-do-pr>:<caminho>`, e não com `Read`.
 - **Sem número:** `git fetch origin main` e use `origin/main...HEAD`. Se houver mudança não commitada
   (`git status --short`), inclua `git diff HEAD` e avise no relatório.
 - Junte para o auditor: a lista de commits (`git log --oneline <base>...<head>`), o `git diff --stat`
@@ -29,9 +32,10 @@ branch), o comando do diff, a lista de commits e o `--stat`, e peça a resposta 
 agente. Não passe o diff inteiro colado: o auditor roda o comando e lê os arquivos ele mesmo.
 
 Se o tipo `auditor-de-seguranca` não estiver disponível na sessão (agentes novos só carregam quando
-a sessão começa), use `subagent_type: "general-purpose"` e abra o prompt pedindo que ele leia
-`.claude/agents/auditor-de-seguranca.md` e siga o corpo do arquivo como instruções, inclusive a regra
-de só leitura.
+a sessão começa), use `subagent_type: "Explore"` (sem `Write`/`Edit`) e abra o prompt pedindo que
+ele leia `.claude/agents/auditor-de-seguranca.md` inteiro e siga o corpo do arquivo como instruções,
+inclusive a regra de só leitura e o formato da resposta. Nunca use um tipo de agente com ferramentas
+de escrita para a revisão.
 
 ## 3. Conferir antes de publicar
 
@@ -39,6 +43,8 @@ O relatório é do auditor, mas a responsabilidade é sua:
 
 - Para cada achado crítico ou alto, abra o arquivo na linha citada e confirme que o problema existe.
   Achado que não se confirma sai do relatório, com uma linha em "Observações" dizendo por quê.
+- Segredo encontrado aparece só como arquivo e linha, **nunca o valor**, nem no relatório nem no
+  comentário do PR. Avise o usuário para revogar a credencial.
 - O veredito segue a regra do agente: **Bloqueado** com crítico ou alto, **Liberado com ressalvas**
   com médio ou baixo, **Liberado** sem achados.
 

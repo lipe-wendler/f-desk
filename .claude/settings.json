@@ -13,7 +13,6 @@
       },
       {
         "matcher": "Bash",
-        "if": "Bash(gh pr create*)",
         "hooks": [
           {
             "type": "command",

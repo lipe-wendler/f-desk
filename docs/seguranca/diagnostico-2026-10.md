@@ -117,10 +117,12 @@ Configurações fora do código. Marque aqui quando aplicar.
 - [x] **Vercel → Production:** `BETTER_AUTH_URL` definido com o domínio final (sem ele, a baseURL cai na
       URL do deploy).
 - [ ] **GitHub → Settings → Rules:** ruleset da `main` criado, mas **inativo**: o GitHub só aplica
-      rulesets e branch protection em repositório privado nos planos pagos. Enquanto isso, o hook
-      `pre-push` barra push para a `main` (inclusive `HEAD:main`) e a `/revisao-de-seguranca` roda
-      antes de cada merge. Para ativar: GitHub Pro ou repositório público.
-- [x] **GitHub → Settings → Code security:** ligar Dependabot alerts e secret scanning.
+      rulesets e branch protection em repositório privado nos planos pagos. Sem isso, a `main` não
+      tem proteção no servidor: o hook `pre-push` só lembra (cai com `--no-verify`, e escrita pela API
+      do GitHub não passa por ele) e o veredito da `/revisao-de-seguranca` é um aviso. Para ativar:
+      GitHub Pro ou repositório público.
+- [x] **GitHub → Settings → Code security:** Dependabot alerts ligado. Secret scanning (Secret
+      Protection) é pago em repositório privado: confirmar se ficou ativo de fato.
 
 ## Como verificar
 

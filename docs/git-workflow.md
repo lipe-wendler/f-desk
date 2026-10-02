@@ -12,8 +12,8 @@
    - Escopos usados: `web`, `api`, `ui`, `db`, `shared`, `config`.
 4. **PR ao terminar a tarefa**, com título no mesmo padrão (ele vira a mensagem do squash) e o template preenchido.
 5. **Revisão de segurança antes do merge**: `/revisao-de-seguranca <número do PR>` no Claude Code (o
-   Claude roda sozinho logo depois de abrir o PR). Veredito **Bloqueado** impede o merge até os
-   achados serem corrigidos. Veja [Revisão de segurança](#revisão-de-segurança).
+   Claude roda sozinho logo depois de abrir o PR). Com veredito **Bloqueado**, não faça o merge até
+   os achados serem corrigidos (é regra do fluxo; o GitHub não impede, veja abaixo). Veja [Revisão de segurança](#revisão-de-segurança).
 6. **Merge só por squash** na `main`. A branch é apagada depois do merge.
 
 ## O que garante isso
@@ -33,8 +33,10 @@
   aprovações), **Require status checks to pass** (`checks`, `branch-name` e `pr-title`), **Restrict
   deletions** e **Block force pushes**. Já está criado, mas **o GitHub só aplica rulesets e branch
   protection em repositório privado nos planos pagos** (Pro, Team): no plano gratuito ele fica
-  salvo e inativo. Enquanto isso, quem protege a `main` é o hook `pre-push` (local) e a regra do
-  fluxo; para ativar de verdade, assine o GitHub Pro ou torne o repositório público.
+  salvo e inativo. **Enquanto isso, nada no servidor protege a `main`:** o hook `pre-push` só
+  lembra (cai com `--no-verify`, e escrita pela API do GitHub nem passa por ele), e o veredito da
+  revisão de segurança é um aviso que depende de quem faz o merge respeitá-lo. Para ativar de
+  verdade, assine o GitHub Pro ou torne o repositório público.
 
 ## Revisão de segurança
 

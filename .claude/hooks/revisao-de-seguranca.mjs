@@ -1,5 +1,6 @@
 // Hook PostToolUse: depois que o Claude abre um PR (MCP do GitHub ou `gh pr create`), lembra de rodar
-// a /revisao-de-seguranca nesse PR. Só injeta contexto; nunca bloqueia nada.
+// a /revisao-de-seguranca nesse PR. Só injeta contexto; nunca bloqueia nada. Da entrada, só o número
+// do PR (dígitos) chega ao texto injetado: nada de fora vira instrução nem é executado.
 import { readFileSync } from 'node:fs'
 
 let input
@@ -14,9 +15,14 @@ const command = input.tool_input?.command ?? ''
 const isGhCreate = input.tool_name === 'Bash' && /\bgh\s+pr\s+create\b/.test(command)
 if (!isGitHubCreate && !isGhCreate) process.exit(0)
 
-// O resultado traz a URL do PR criado (`.../pull/123`); sem ela, a ferramenta falhou.
-const result = JSON.stringify(input.tool_response ?? input.tool_result ?? '')
-const number = result.match(/\/pull\/(\d+)/)?.[1]
+// O resultado traz a URL do PR criado (`.../pull/123`); sem ela, a ferramenta falhou. No `gh`, só a
+// saída padrão conta (o erro "a pull request already exists" cita outro PR) e vale a última URL,
+// para comandos compostos que listam PRs antes de criar.
+const response = input.tool_response ?? input.tool_result ?? {}
+const text = isGitHubCreate
+  ? String(response.url ?? JSON.stringify(response))
+  : String(response.stdout ?? '')
+const number = [...text.matchAll(/\/pull\/(\d+)/g)].at(-1)?.[1]
 if (!number) process.exit(0)
 
 process.stdout.write(
