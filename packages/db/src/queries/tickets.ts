@@ -204,17 +204,18 @@ export async function closeClientTicket(
 
 /** Conversas do usuário com a Wen, da mais recente para a mais antiga. */
 export async function listConversations(params: { userId: string; limit: number; offset: number }) {
+  // SQL escrito à mão de propósito: numa consulta de uma tabela só, o Drizzle omite o nome da tabela
+  // nas colunas, e dentro destas subconsultas `"id"` passaria a ser o id da outra tabela.
+  const outerId = sql.raw('"conversation"."id"')
   const firstQuestion = sql<string | null>`(
-    select ${conversationMessage.content} from ${conversationMessage}
-    where ${conversationMessage.conversationId} = ${conversation.id} and ${conversationMessage.role} = 'user'
-    order by ${conversationMessage.id} limit 1)`
+    select cm.content from conversation_message cm
+    where cm.conversation_id = ${outerId} and cm.role = 'user'
+    order by cm.id limit 1)`
   const messageCount = sql<number>`(
-    select count(*)::int from ${conversationMessage}
-    where ${conversationMessage.conversationId} = ${conversation.id})`
+    select count(*)::int from conversation_message cm where cm.conversation_id = ${outerId})`
   const ticketCode = sql<string | null>`(
-    select ${ticket.code} from ${ticket}
-    where ${ticket.conversationId} = ${conversation.id}
-    order by ${ticket.number} desc limit 1)`
+    select t.code from ticket t where t.conversation_id = ${outerId}
+    order by t.number desc limit 1)`
 
   const where = eq(conversation.userId, params.userId)
   const [rows, [totalRow]] = await Promise.all([
