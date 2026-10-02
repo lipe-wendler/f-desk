@@ -1,0 +1,1 @@
+ALTER TABLE "conversation_message" ADD COLUMN "imported" boolean DEFAULT false NOT NULL;

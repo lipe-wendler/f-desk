@@ -233,7 +233,7 @@ void staffApi.assignees().then((r) => {
       <div class="flex flex-col gap-4 rounded-lg border border-line bg-surface p-6 shadow-card">
         <FwSectionLabel>Conversa com a Wen</FwSectionLabel>
         <div v-if="ticket.transcript.length" class="max-h-[60vh] overflow-y-auto pr-1">
-          <TranscriptView :messages="ticket.transcript" />
+          <TranscriptView :messages="ticket.transcript" flag-imported />
         </div>
         <p v-else class="m-0 text-sm text-ink-muted">Nenhuma conversa anexada.</p>
         <FwButton :to="{ name: 'staff-dashboard' }" variant="secondary">Voltar à fila</FwButton>

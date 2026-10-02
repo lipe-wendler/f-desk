@@ -77,6 +77,11 @@ export const conversationMessage = pgTable(
     source: text('source', { enum: CHAT_SOURCES }),
     /** Fala do Wen que registra o chamado aberto pela conversa (o cartão do chamado aparece nela). */
     ticketId: uuid('ticket_id').references((): AnyPgColumn => ticket.id, { onDelete: 'set null' }),
+    /**
+     * Veio da transcrição do navegador (conversa de visitante), não de uma troca gravada pela API.
+     * O texto não é verificado: uma fala "da Wen" aqui pode ter sido escrita pelo próprio cliente.
+     */
+    imported: boolean('imported').default(false).notNull(),
     createdAt: createdAt(),
   },
   (table) => [

@@ -131,7 +131,7 @@ export async function getStaffTicket(code: string) {
         with: {
           messages: {
             orderBy: asc(conversationMessage.id),
-            columns: { role: true, content: true, source: true },
+            columns: { role: true, content: true, source: true, imported: true },
           },
         },
       },

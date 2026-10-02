@@ -21,9 +21,11 @@ export const technician = ac.newRole({
 })
 
 // Só o que a gestão de usuários usa: sem personificar (`impersonate`) nem apagar contas
-// (`delete`) — contas são desativadas para manter o histórico de chamados.
+// (`delete`) — contas são desativadas para manter o histórico de chamados. Sem `update`: ele só
+// libera `/admin/update-user`, que muda perfil e desativação por fora das regras do `adminGuard`
+// (que valem em `set-role` e `ban-user`).
 export const admin = ac.newRole({
-  user: ['create', 'list', 'get', 'update', 'set-role', 'ban', 'set-password'],
+  user: ['create', 'list', 'get', 'set-role', 'ban', 'set-password'],
   session: ['list', 'revoke'],
   ticket: ['read', 'update', 'assign'],
 })

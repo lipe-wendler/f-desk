@@ -74,12 +74,14 @@ Navegador ──► Vercel (mesmo domínio)
       fala e não propõe outro chamado. A proposta pendente ou descartada fica só no navegador.
   - **Limite:** 20 mensagens a cada 10 minutos por conta ou por IP, contado no Postgres
     (`chat_rate_limit`; serverless não compartilha memória). O IP é guardado como hash.
+  - **Contexto:** com conversa gravada do usuário, o histórico que vai ao LLM vem do banco
+    (`getConversationHistory`), não do corpo da requisição; o `history` enviado só vale para visitante.
 
 - **Chamados do cliente** (`/api/tickets`, só `client`, só os próprios; de outra pessoa a resposta é 404):
   - `POST /` abre o chamado (só pela proposta do Wen no atendimento). A conversa com a Wen vai junto: a
     gravada (`conversationId`) quando ela está completa no servidor, ou a transcrição do navegador
-    (visitante que entrou para abrir o chamado), que vira uma conversa nova. Tudo num `batch`
-    transacional. Devolve o código e o id da conversa ligada, que passa a ser a do atendimento.
+    (visitante que entrou para abrir o chamado), que vira uma conversa nova com as mensagens marcadas
+    como `imported` (a equipe vê o aviso de trecho não verificado). Tudo num `batch` transacional. Devolve o código e o id da conversa ligada, que passa a ser a do atendimento.
   - `GET /` (filtro `active`/`done`/`all`), `GET /:code` (mensagens sem as notas internas e a conversa de
     origem), `POST /:code/messages` e `POST /:code/close`.
   - Resposta do cliente em `waiting_client` ou `resolved` volta o chamado para `in_progress`; `closed` só
@@ -156,3 +158,8 @@ Schema em `packages/db/src/schema`; status, prioridades e papéis das mensagens 
 11. ~~`feat/sidebar-de-conversas-no-atendimento`~~ — concluída
 12. ~~`feat/fluxos-guiados-e-novo-visual-do-chat`~~ — concluída
 13. ~~`feat/abertura-de-chamado-pelo-chatbot`~~ — concluída
+14. ~~`fix/diagnostico-e-correcoes-de-seguranca`~~ — concluída ([diagnóstico](seguranca/diagnostico-2026-10.md))
+15. `chore/revisao-de-seguranca-com-claude`
+16. `feat/criar-conta-pelo-cartao-de-chamado`
+17. `feat/cancelar-e-resolver-chamado-pelo-cliente`
+18. `feat/wen-consulta-e-acoes-em-chamados`

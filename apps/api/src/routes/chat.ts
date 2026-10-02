@@ -12,6 +12,7 @@ import {
   fieldErrors,
   proposalFromMessages,
   type ChatEvent,
+  type ChatMessage,
   type ChatReplySource,
   type TicketProposal,
 } from '@f-desk/shared'
@@ -36,6 +37,11 @@ export interface ChatDeps {
   secret: string
   /** Título e tipo da conversa nova pelo LLM (padrão: `describeConversation`). Injetável nos testes. */
   describe?: typeof describeConversation
+  /**
+   * Histórico gravado de uma conversa do usuário (`null` se não for dele). Com conversa gravada, o
+   * contexto do LLM vem daqui, e não do `history` do corpo, que o navegador pode forjar.
+   */
+  loadHistory?: (userId: string, conversationId: string) => Promise<ChatMessage[] | null>
 }
 
 /**
@@ -54,7 +60,7 @@ export function createChatRoute(deps: ChatDeps) {
         if (!parsed.success) {
           return c.json({ error: 'Mensagem inválida.', fields: fieldErrors(parsed.error) }, 400)
         }
-        const { message, history, conversationId, faqId } = parsed.data
+        const { message, conversationId, faqId } = parsed.data
         const user = c.get('user')
 
         const quota = await deps.consumeQuota(
@@ -67,6 +73,12 @@ export function createChatRoute(deps: ChatDeps) {
             429,
           )
         }
+
+        const saved =
+          user && conversationId && deps.loadHistory
+            ? await deps.loadHistory(user.id, conversationId)
+            : null
+        const history = saved ?? parsed.data.history
 
         // Opção do atendimento guiado: a resposta pronta escolhida, sem depender da busca por palavras.
         const chosen = faqId ? FAQ.find((entry) => entry.id === faqId) : undefined
