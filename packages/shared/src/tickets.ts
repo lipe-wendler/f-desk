@@ -100,8 +100,13 @@ export const createTicketSchema = z.object({
     .min(10, { error: 'Conte um pouco mais sobre o problema.' })
     .max(TICKET_MESSAGE_MAX, { error: `Use no máximo ${TICKET_MESSAGE_MAX} caracteres.` }),
   transcript: z.array(chatMessageSchema).max(100).default([]),
+  /** Conversa já gravada (cliente logado no chat). Quando existe, a transcrição é ignorada. */
+  conversationId: z.uuid().optional(),
 })
 export type CreateTicketInput = z.infer<typeof createTicketSchema>
+
+/** Código do chamado na URL e na API (`TKT-0001`). */
+export const TICKET_CODE_PATTERN = /^TKT-\d{4,}$/
 
 /** Resposta no chamado. `internal` (nota só da equipe) é ignorado pela API quando quem escreve é o cliente. */
 export const ticketMessageSchema = z.object({
@@ -126,3 +131,56 @@ export const updateTicketSchema = z
     error: 'Nada para alterar.',
   })
 export type UpdateTicketInput = z.infer<typeof updateTicketSchema>
+
+// Respostas da API do cliente (datas em ISO 8601).
+
+export interface TicketSummary {
+  code: string
+  subject: string
+  status: TicketStatus
+  priority: TicketPriority
+  createdAt: string
+  updatedAt: string
+}
+
+export interface TicketThreadMessage {
+  id: number
+  content: string
+  createdAt: string
+  /** `fromClient`: escrita pelo próprio cliente; senão, pela equipe. */
+  author: { name: string; fromClient: boolean }
+}
+
+export interface TranscriptMessage {
+  role: ChatRole
+  content: string
+  source: ChatSource | null
+}
+
+export interface TicketDetail extends TicketSummary {
+  description: string
+  resolvedAt: string | null
+  closedAt: string | null
+  assigneeName: string | null
+  messages: TicketThreadMessage[]
+  /** Conversa com a Wen que originou o chamado. */
+  transcript: TranscriptMessage[]
+}
+
+export interface ConversationSummary {
+  id: string
+  createdAt: string
+  updatedAt: string
+  firstQuestion: string | null
+  messageCount: number
+  /** Último chamado aberto a partir da conversa. */
+  ticketCode: string | null
+}
+
+export interface ConversationDetail {
+  id: string
+  createdAt: string
+  updatedAt: string
+  messages: (TranscriptMessage & { createdAt: string })[]
+  tickets: { code: string; status: TicketStatus }[]
+}
