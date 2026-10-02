@@ -1,7 +1,13 @@
 import {
   CHAT_HISTORY_MAX,
   CHAT_MESSAGE_MAX,
+  FAQ,
+  GUIDED_FEEDBACK,
+  GUIDED_FLOWS,
+  GUIDED_OTHER,
   type ChatMessage,
+  type FaqCategory,
+  type TicketStatus,
   type ChatReplySource,
   type RequestKind,
 } from '@f-desk/shared'
@@ -19,7 +25,18 @@ export interface ChatEntry {
   pending?: boolean
   /** A resposta falhou; não volta para o histórico enviado ao chat. */
   failed?: boolean
+  /** Passo do atendimento guiado montado no navegador: não vai para a API nem para o LLM. */
+  local?: boolean
+  /** Opções do atendimento guiado sob a bolha do Wen (`faqId` ou `OTHER_OPTION`). */
+  options?: { id: string; label: string }[]
+  /** Opção escolhida; a lista some depois da escolha. */
+  chosen?: string
+  /** Depois de uma resposta pronta: "Isso resolveu?" e o que a pessoa respondeu. */
+  feedback?: 'pending' | 'resolved' | 'unresolved'
 }
+
+/** Opção "Outro assunto" do atendimento guiado: libera o texto livre. */
+export const OTHER_OPTION = 'outro'
 
 interface Persisted {
   ownerId: string | null
@@ -58,6 +75,8 @@ export const useChatStore = defineStore('chat', () => {
   const loading = ref(false)
   /** Título e tipo dados pelo bot à conversa nova (para a lista da sidebar). */
   const meta = ref<{ title: string; kind: RequestKind | null } | null>(null)
+  /** Chamados abertos a partir da conversa salva (status no cabeçalho). */
+  const tickets = ref<{ code: string; status: TicketStatus }[]>([])
 
   /** Carrega a conversa salva. A de outra conta é descartada; a do visitante segue após o login. */
   function hydrate(userId: string | null) {
@@ -67,7 +86,7 @@ export const useChatStore = defineStore('chat', () => {
     const keepsId = sameOwner && saved.ownerId === userId
     conversationId.value = keepsId ? saved.conversationId : undefined
     // Conversa do visitante que segue após o login: o começo não está no servidor.
-    partial.value = keepsId ? Boolean(saved.partial) : messages.value.length > 0
+    partial.value = keepsId ? Boolean(saved.partial) : messages.value.some((m) => !m.local)
     ownerId.value = userId
     // Grava já: a conversa passa a ser desta conta antes de qualquer troca de usuário.
     persist()
@@ -92,11 +111,12 @@ export const useChatStore = defineStore('chat', () => {
   /** O que vai para a API como contexto e, na tarefa de chamados, junto com o chamado. */
   const transcript = computed<ChatMessage[]>(() =>
     messages.value
-      .filter((m) => !m.pending && !m.failed && m.content.trim())
+      .filter((m) => !m.local && !m.pending && !m.failed && m.content.trim())
       .map((m) => ({ role: m.role, content: m.content.slice(0, CHAT_MESSAGE_MAX) })),
   )
 
-  async function send(text: string) {
+  /** Envia ao chat. Com `faqId` (opção do atendimento guiado) a API responde pela resposta pronta, sem LLM. */
+  async function send(text: string, options: { faqId?: string } = {}) {
     const message = text.trim()
     if (!message || sending.value) return false
     notice.value = ''
@@ -108,13 +128,17 @@ export const useChatStore = defineStore('chat', () => {
     sending.value = true
 
     const result = await streamChat(
-      { message, history, conversationId: conversationId.value },
+      { message, history, conversationId: conversationId.value, faqId: options.faqId },
       (event) => {
         if (event.type === 'start') reply.source = event.source
         else if (event.type === 'delta') reply.content += event.text
         else if (event.type === 'end') {
           // Primeira gravação depois de mensagens que ficaram só no navegador.
-          if (event.conversationId && !conversationId.value && messages.value.length > 2)
+          if (
+            event.conversationId &&
+            !conversationId.value &&
+            messages.value.filter((m) => !m.local).length > 2
+          )
             partial.value = true
           if (event.conversationId) conversationId.value = event.conversationId
           if (event.title) meta.value = { title: event.title, kind: event.kind ?? null }
@@ -139,7 +163,58 @@ export const useChatStore = defineStore('chat', () => {
       return false
     }
     reply.pending = false
+    // Resposta pronta: o Wen pergunta se resolveu.
+    if (reply.source === 'faq' && !reply.failed) reply.feedback = 'pending'
     return true
+  }
+
+  function local(role: ChatEntry['role'], content: string, extra: Partial<ChatEntry> = {}) {
+    messages.value.push({ id: newId(), role, content, local: true, ...extra })
+  }
+
+  /** Começa o atendimento guiado: a categoria vira a fala do cliente e o Wen mostra as opções. */
+  function startFlow(category: FaqCategory) {
+    if (sending.value) return
+    const flow = GUIDED_FLOWS[category]
+    local('user', flow.label)
+    local('assistant', flow.intro, {
+      options: [
+        ...FAQ.filter((e) => e.category === category).map((e) => ({ id: e.id, label: e.question })),
+        { id: OTHER_OPTION, label: GUIDED_OTHER.label },
+      ],
+    })
+  }
+
+  /**
+   * Escolha numa lista de opções. Uma pergunta do FAQ vai à API pelo id (resposta pronta, sem LLM);
+   * "Outro assunto" só abre o texto livre. Devolve o que aconteceu, para a tela levar o foco.
+   */
+  async function chooseOption(
+    entryId: string,
+    optionId: string,
+  ): Promise<'sent' | 'other' | 'failed'> {
+    const entry = messages.value.find((m) => m.id === entryId)
+    const option = entry?.options?.find((o) => o.id === optionId)
+    if (!entry || !option || entry.chosen || sending.value) return 'failed'
+    entry.chosen = optionId
+    if (optionId === OTHER_OPTION) {
+      local('user', option.label)
+      local('assistant', GUIDED_OTHER.reply)
+      return 'other'
+    }
+    const ok = await send(option.label, { faqId: optionId })
+    if (!ok) entry.chosen = undefined
+    return ok ? 'sent' : 'failed'
+  }
+
+  /** "Resolveu" / "Não resolveu" depois de uma resposta pronta. */
+  function giveFeedback(entryId: string, resolved: boolean) {
+    const entry = messages.value.find((m) => m.id === entryId)
+    if (!entry || entry.feedback !== 'pending') return
+    entry.feedback = resolved ? 'resolved' : 'unresolved'
+    const answer = resolved ? GUIDED_FEEDBACK.resolved : GUIDED_FEEDBACK.unresolved
+    local('user', answer.label)
+    local('assistant', answer.reply)
   }
 
   /** Abre uma conversa gravada no servidor (lista da sidebar). Devolve false se ela não existe para esta conta. */
@@ -157,6 +232,7 @@ export const useChatStore = defineStore('chat', () => {
     }))
     conversationId.value = data.id
     meta.value = data.title ? { title: data.title, kind: data.kind } : null
+    tickets.value = data.tickets
     partial.value = false
     notice.value = ''
     return true
@@ -166,6 +242,7 @@ export const useChatStore = defineStore('chat', () => {
     messages.value = []
     conversationId.value = undefined
     meta.value = null
+    tickets.value = []
     partial.value = false
     notice.value = ''
   }
@@ -188,10 +265,14 @@ export const useChatStore = defineStore('chat', () => {
     notice,
     loading,
     meta,
+    tickets,
     transcript,
     ticketAttachment,
     hydrate,
     send,
+    startFlow,
+    chooseOption,
+    giveFeedback,
     loadConversation,
     reset,
   }

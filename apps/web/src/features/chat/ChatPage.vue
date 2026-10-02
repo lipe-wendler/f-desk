@@ -1,6 +1,14 @@
 <script setup lang="ts">
-import { CHAT_INPUT_MAX, FAQ, FAQ_CATEGORIES, type FaqCategory } from '@f-desk/shared'
-import { FwButton, FwIcon, FwSectionLabel, FwTabs, FwTag } from '@f-desk/ui'
+import {
+  CHAT_INPUT_MAX,
+  FAQ,
+  GUIDED_FEEDBACK,
+  QUICK_SUGGESTIONS,
+  TICKET_STATUS_LABEL,
+  type FaqCategory,
+  type FaqEntry,
+} from '@f-desk/shared'
+import { FwButton, FwIcon, type IconName } from '@f-desk/ui'
 import { computed, nextTick, ref, useTemplateRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useToast } from '../../composables/useToast'
@@ -8,11 +16,16 @@ import { useChatStore } from '../../stores/chat'
 import { useConversationsStore } from '../../stores/conversations'
 import { useSessionStore } from '../../stores/session'
 import ChatComposer from './ChatComposer.vue'
+import ChatHeader from './ChatHeader.vue'
+import ChatWelcome from './ChatWelcome.vue'
+import ChatBubble from './conversation/ChatBubble.vue'
+import OptionList from './conversation/OptionList.vue'
 import './chat.css'
 
 /**
- * Chatbot público: qualquer visitante tira dúvidas sem conta. A página ocupa a altura da tela e só
- * a lista de mensagens rola. Do cliente, `/atendimento/:conversa` abre uma conversa salva.
+ * Atendimento: qualquer visitante conversa com o Wen sem conta. A página ocupa a altura da tela e
+ * só a conversa rola. Dúvida e problema começam pelo atendimento guiado (respostas prontas, sem
+ * LLM); o texto livre vai para o LLM. Do cliente, `/atendimento/:conversa` abre uma conversa salva.
  */
 const chat = useChatStore()
 const session = useSessionStore()
@@ -22,16 +35,34 @@ const router = useRouter()
 const toast = useToast()
 
 const draft = ref('')
-const category = ref<FaqCategory>(FAQ_CATEGORIES[0].id)
-const tabs = FAQ_CATEGORIES.map((c) => ({ value: c.id, label: c.label }))
-const suggestions = computed(() => FAQ.filter((entry) => entry.category === category.value))
 const list = useTemplateRef<HTMLElement>('list')
+const composer = useTemplateRef<InstanceType<typeof ChatComposer>>('composer')
+/** Texto lido pelos leitores de tela quando uma resposta termina (nunca pedaço por pedaço). */
+const announcement = ref('')
 
 const isClient = computed(() => session.user?.role === 'client')
 const hasMessages = computed(() => chat.messages.length > 0)
 const routeId = computed(() =>
   typeof route.params.conversa === 'string' ? route.params.conversa : undefined,
 )
+const lastId = computed(() => chat.messages.at(-1)?.id)
+
+/** Nome da conversa no cabeçalho: o título do bot, a categoria escolhida ou a primeira fala. */
+const title = computed(() => {
+  if (!hasMessages.value) return 'Início'
+  return (
+    chat.meta?.title ?? chat.messages.find((m) => m.role === 'user')?.content ?? 'Nova conversa'
+  )
+})
+const ticket = computed(() => chat.tickets.at(-1))
+
+const SUGGESTION_ICONS: Record<string, IconName> = {
+  'sem-acesso-conta': 'key',
+  'internet-lenta': 'zap',
+  impressora: 'file',
+  'email-nao-envia': 'mail',
+}
+const suggestions = QUICK_SUGGESTIONS.map((id) => FAQ.find((e) => e.id === id)!)
 
 watch(
   () => session.user?.id ?? null,
@@ -74,7 +105,7 @@ function scrollToEnd() {
 }
 
 watch(
-  () => chat.messages.map((m) => m.content.length).join(),
+  () => chat.messages.map((m) => `${m.id}:${m.content.length}`).join(),
   async () => {
     if (!atBottom.value) return
     await nextTick()
@@ -91,6 +122,25 @@ watch(
   },
 )
 
+function announceLast() {
+  const last = chat.messages.at(-1)
+  if (last?.role === 'assistant' && last.content) announcement.value = `Wen: ${last.content}`
+}
+
+/** Depois de uma troca gravada: a lista da sidebar sobe a conversa e a URL passa a apontar para ela. */
+async function afterSaved(before: string | undefined, message: string) {
+  if (!chat.conversationId) return
+  conversations.touch({
+    id: chat.conversationId,
+    firstQuestion: chat.messages.find((m) => m.role === 'user' && !m.local)?.content ?? message,
+    lastMessage: chat.messages.at(-1)?.content ?? message,
+    title: chat.meta?.title,
+    kind: chat.meta?.kind,
+  })
+  if (chat.conversationId !== before || routeId.value !== chat.conversationId)
+    await router.replace({ name: 'chat', params: { conversa: chat.conversationId } })
+}
+
 async function send(text = draft.value) {
   const message = text.trim()
   if (!message || chat.sending) return
@@ -100,56 +150,108 @@ async function send(text = draft.value) {
   atBottom.value = true
   const ok = await chat.send(message)
   if (!ok && !draft.value) draft.value = message
-  if (!ok || !chat.conversationId) return
-  // Conversa gravada: a lista da sidebar sobe esta conversa e a URL passa a apontar para ela.
-  const first = chat.messages.find((m) => m.role === 'user')?.content ?? message
-  conversations.touch({
-    id: chat.conversationId,
-    firstQuestion: first,
-    lastMessage: chat.messages.at(-1)?.content ?? message,
-    title: chat.meta?.title,
-    kind: chat.meta?.kind,
-  })
-  if (chat.conversationId !== before || routeId.value !== chat.conversationId)
-    await router.replace({ name: 'chat', params: { conversa: chat.conversationId } })
+  if (!ok) return
+  announceLast()
+  await afterSaved(before, message)
+}
+
+/** Atalho da conversa vazia: pergunta do FAQ respondida pelo id, sem LLM. */
+async function sendSuggestion(entry: FaqEntry) {
+  if (chat.sending) return
+  const before = chat.conversationId
+  atBottom.value = true
+  if (!(await chat.send(entry.question, { faqId: entry.id }))) return
+  announceLast()
+  await afterSaved(before, entry.question)
+}
+
+function startFlow(category: FaqCategory) {
+  atBottom.value = true
+  chat.startFlow(category)
+  announceLast()
+}
+
+async function choose(entryId: string, optionId: string) {
+  const before = chat.conversationId
+  atBottom.value = true
+  const result = await chat.chooseOption(entryId, optionId)
+  if (result === 'failed') return
+  announceLast()
+  if (result === 'other') composer.value?.focus()
+  else await afterSaved(before, chat.messages.findLast((m) => m.role === 'user')?.content ?? '')
+}
+
+function feedback(entryId: string, resolved: boolean) {
+  chat.giveFeedback(entryId, resolved)
+  announceLast()
+  if (!resolved) composer.value?.focus()
+}
+
+async function newConversation() {
+  chat.reset()
+  await router.push({ name: 'chat' })
 }
 </script>
 
 <template>
   <div class="flex min-h-0 flex-1 flex-col">
+    <ChatHeader :current="title" @home="newConversation" />
+
     <div v-if="hasMessages" class="relative flex min-h-0 flex-1 flex-col">
       <div
         ref="list"
-        role="log"
-        aria-label="Mensagens da conversa"
-        aria-live="polite"
-        class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-6 sm:px-8"
+        class="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-6 sm:px-8"
         data-testid="chat-messages"
         @scroll.passive="onScroll"
       >
-        <h1 class="sr-only">Atendimento</h1>
-        <div
-          v-for="m in chat.messages"
-          :key="m.id"
-          :class="[
-            'mx-auto flex w-full max-w-3xl flex-col gap-1',
-            m.role === 'user' ? 'items-end' : 'items-start',
-          ]"
-        >
-          <span class="font-mono text-[12px] tracking-[0.16em] text-ink-muted uppercase">
-            {{ m.role === 'user' ? 'Você' : 'Wen' }}
-            <template v-if="m.source === 'faq'"> · resposta pronta</template>
-          </span>
-          <p
-            :class="[
-              'm-0 max-w-[60ch] rounded-lg px-4 py-3 whitespace-pre-line',
-              m.role === 'user' ? 'bg-surface-raised' : 'border border-line',
-              m.failed && 'border-danger text-ink-muted',
-            ]"
-          >
-            <template v-if="m.content">{{ m.content }}</template>
-            <span v-else class="text-ink-muted">Digitando…</span>
-          </p>
+        <div class="mx-auto flex w-full max-w-3xl flex-col gap-5">
+          <div class="chat-conversation-head">
+            <button type="button" class="chat-back" @click="newConversation">
+              <FwIcon name="arrow-left" size="sm" />Voltar ao início
+            </button>
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <h1 class="m-0 min-w-0 font-display text-2xl leading-8 font-bold tracking-[-0.01em]">
+                {{ title }}
+              </h1>
+              <RouterLink
+                v-if="ticket"
+                :to="`/chamados/${ticket.code}`"
+                class="chat-conversation-status"
+              >
+                <span class="size-2 rounded-pill bg-accent" aria-hidden="true" />
+                Chamado {{ ticket.code }} · {{ TICKET_STATUS_LABEL[ticket.status] }}
+              </RouterLink>
+              <span v-else class="chat-conversation-status">
+                <span class="size-2 rounded-pill bg-accent" aria-hidden="true" />Em andamento
+              </span>
+            </div>
+          </div>
+
+          <ol class="m-0 flex list-none flex-col gap-5 p-0" aria-label="Mensagens da conversa">
+            <li v-for="m in chat.messages" :key="m.id">
+              <ChatBubble :entry="m">
+                <OptionList
+                  v-if="m.options && !m.chosen && m.id === lastId"
+                  :options="m.options"
+                  :disabled="chat.sending"
+                  label="Opções"
+                  @choose="(id) => choose(m.id, id)"
+                />
+                <div
+                  v-if="m.feedback === 'pending' && m.id === lastId && !chat.sending"
+                  class="flex flex-wrap items-center gap-2 pt-1"
+                >
+                  <span class="text-sm text-ink-muted">{{ GUIDED_FEEDBACK.question }}</span>
+                  <button type="button" class="chat-chip" @click="feedback(m.id, true)">
+                    <FwIcon name="check" size="sm" />{{ GUIDED_FEEDBACK.resolved.label }}
+                  </button>
+                  <button type="button" class="chat-chip" @click="feedback(m.id, false)">
+                    <FwIcon name="close" size="sm" />{{ GUIDED_FEEDBACK.unresolved.label }}
+                  </button>
+                </div>
+              </ChatBubble>
+            </li>
+          </ol>
         </div>
       </div>
       <button
@@ -163,36 +265,30 @@ async function send(text = draft.value) {
     </div>
 
     <div v-else class="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-8 sm:px-8">
-      <div class="mx-auto flex w-full max-w-3xl flex-col gap-6">
-        <div class="flex flex-col gap-3">
-          <FwSectionLabel bar>Atendimento</FwSectionLabel>
-          <h1
-            class="m-0 font-display text-[32px] leading-10 font-semibold tracking-[-0.015em] sm:text-[44px] sm:leading-[52px] sm:font-bold"
-          >
-            Como posso <span class="fw-hl">ajudar?</span>
-          </h1>
-          <p class="m-0 max-w-[56ch] text-ink-muted">
-            Wen, assistente de suporte da F.Wendler, responde às dúvidas mais comuns na hora. Se o
-            caso precisar de um técnico, você abre um chamado e acompanha tudo por aqui.
-          </p>
-        </div>
-        <p v-if="chat.loading" class="m-0 text-sm text-ink-muted" role="status">
-          Abrindo a conversa…
-        </p>
-        <div v-else class="flex flex-col gap-3">
-          <FwTabs v-model="category" :items="tabs" label="Tipo de atendimento" variant="neutral" />
-          <div class="flex flex-wrap gap-2">
-            <FwTag v-for="s in suggestions" :key="s.id" clickable @click="send(s.question)">
-              {{ s.question }}
-            </FwTag>
-          </div>
-        </div>
-      </div>
+      <p v-if="chat.loading" class="m-auto text-sm text-ink-muted" role="status">
+        Abrindo a conversa…
+      </p>
+      <ChatWelcome v-else @start="startFlow" />
     </div>
 
+    <p class="sr-only" aria-live="polite">{{ announcement }}</p>
+
     <div class="flex-none bg-bg px-4 pt-2 pb-4 sm:px-8">
-      <div class="mx-auto flex w-full max-w-3xl flex-col gap-2">
+      <div class="mx-auto flex w-full max-w-3xl flex-col gap-3">
+        <ul v-if="!hasMessages && !chat.loading" class="chat-suggestions" aria-label="Sugestões">
+          <li v-for="s in suggestions" :key="s.id">
+            <button
+              type="button"
+              class="chat-chip"
+              :disabled="chat.sending"
+              @click="sendSuggestion(s)"
+            >
+              <FwIcon :name="SUGGESTION_ICONS[s.id] ?? 'message'" size="sm" />{{ s.question }}
+            </button>
+          </li>
+        </ul>
         <ChatComposer
+          ref="composer"
           v-model="draft"
           :max-length="CHAT_INPUT_MAX"
           :sending="chat.sending"
