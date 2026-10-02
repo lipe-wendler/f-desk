@@ -11,16 +11,16 @@ const session = useSessionStore()
 const links = computed(() => {
   if (session.user?.role === 'client')
     return [
-      { label: 'Atendimento', to: '/' },
+      { label: 'Atendimento', to: '/atendimento' },
       { label: 'Meus chamados', to: '/chamados', match: '/chamados' },
       { label: 'Conversas', to: '/conversas' },
     ]
   if (session.isStaff)
     return [
-      { label: 'Atendimento', to: '/' },
+      { label: 'Atendimento', to: '/atendimento' },
       { label: 'Dashboard', to: '/tecnico', match: '/tecnico' },
     ]
-  return [{ label: 'Atendimento', to: '/' }]
+  return [{ label: 'Atendimento', to: '/atendimento' }]
 })
 </script>
 
@@ -32,7 +32,10 @@ const links = computed(() => {
         <UserMenu v-if="session.user" />
         <template v-else>
           <FwButton variant="ghost" size="sm" to="/entrar">Entrar</FwButton>
-          <FwButton size="sm" to="/criar-conta" class="max-sm:hidden">Criar conta</FwButton>
+          <!-- Visibilidade num wrapper: o CSS do design system vence os utilitários do Tailwind. -->
+          <span class="contents max-sm:hidden">
+            <FwButton size="sm" to="/criar-conta">Criar conta</FwButton>
+          </span>
         </template>
       </template>
     </FwAppHeader>

@@ -96,7 +96,7 @@ Schema em `packages/db/src/schema`; status, prioridades e papéis das mensagens 
 
 | Rota                                                             | Acesso                                                    |
 | ---------------------------------------------------------------- | --------------------------------------------------------- |
-| `/`, `/entrar`, `/criar-conta`                                   | Pública (entrar/criar conta só para quem não está logado) |
+| `/` (landing page), `/atendimento`, `/entrar`, `/criar-conta`    | Pública (entrar/criar conta só para quem não está logado) |
 | `/chamados`, `/chamados/novo`, `/chamados/:codigo`, `/conversas` | `client`                                                  |
 | `/tecnico`, `/tecnico/chamados/:id`                              | `technician`, `admin`                                     |
 | `/admin/usuarios`                                                | `admin`                                                   |
@@ -110,4 +110,10 @@ Schema em `packages/db/src/schema`; status, prioridades e papéis das mensagens 
 4. ~~`feat/chatbot-faq-e-llm`~~ — concluída
 5. ~~`feat/abertura-de-chamado-e-historico`~~ — concluída
 6. ~~`feat/dashboard-do-tecnico`~~ — concluída
-7. `feat/recuperacao-de-senha-e-verificacao-de-email` (precisa de um provedor de e-mail)
+7. `feat/recuperacao-de-senha-e-verificacao-de-email` (adiada: precisa de um provedor de e-mail)
+8. ~~`fix/link-ativo-no-menu`~~ — concluída
+9. ~~`feat/identidade-visual-logo-e-simbolo`~~ — concluída
+10. `feat/landing-page`
+11. `feat/sidebar-de-conversas-no-atendimento`
+12. `feat/fluxos-guiados-e-novo-visual-do-chat`
+13. `feat/abertura-de-chamado-pelo-chatbot`

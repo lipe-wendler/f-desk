@@ -9,6 +9,6 @@ import { FwButton, FwSectionLabel } from '@f-desk/ui'
       Página não <span class="fw-hl">encontrada.</span>
     </h1>
     <p class="m-0 text-ink-muted">O endereço pode ter mudado ou nunca ter existido.</p>
-    <div><FwButton to="/" arrow>Ir para o atendimento</FwButton></div>
+    <div><FwButton :to="{ name: 'chat' }" arrow>Ir para o atendimento</FwButton></div>
   </div>
 </template>

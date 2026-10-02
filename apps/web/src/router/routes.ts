@@ -5,13 +5,26 @@ const STAFF = ['technician', 'admin'] as const
 const ADMIN = ['admin'] as const
 
 export const routes: RouteRecordRaw[] = [
+  // Landing page: aberta para todos, logados ou não.
+  {
+    path: '/',
+    component: () => import('../layouts/LandingLayout.vue'),
+    children: [
+      {
+        path: '',
+        name: 'landing',
+        component: () => import('../features/landing/LandingPage.vue'),
+        meta: { title: 'Suporte que resolve' },
+      },
+    ],
+  },
   {
     path: '/',
     component: () => import('../layouts/PublicLayout.vue'),
     children: [
       // Público: visitante tira dúvidas no chatbot sem criar conta.
       {
-        path: '',
+        path: 'atendimento',
         name: 'chat',
         component: () => import('../features/chat/ChatPage.vue'),
         meta: { title: 'Atendimento' },
