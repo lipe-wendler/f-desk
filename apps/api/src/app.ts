@@ -1,12 +1,24 @@
 import { Hono } from 'hono'
 import { logger } from 'hono/logger'
-import { consumeChatQuota, saveChatExchange } from '@f-desk/db'
+import {
+  addClientReply,
+  closeClientTicket,
+  consumeChatQuota,
+  createTicket,
+  getClientTicket,
+  getConversation,
+  listClientTickets,
+  listConversations,
+  saveChatExchange,
+} from '@f-desk/db'
 import { auth } from './auth'
 import { env } from './env'
 import { sessionMiddleware, type AppEnv } from './middleware/session'
 import { adminUsers } from './routes/admin-users'
 import { createChatRoute } from './routes/chat'
+import { createConversationsRoute } from './routes/conversations'
 import { health } from './routes/health'
+import { createTicketsRoute } from './routes/tickets'
 import { createLanguageModel, resolveLlmConfig } from './services/llm/models'
 import { createQuota } from './services/rate-limit'
 
@@ -42,8 +54,22 @@ app.route(
   }),
 )
 
-// Próximas tarefas:
-// app.route('/tickets', tickets)                                     → requireAuth
+app.route(
+  '/tickets',
+  createTicketsRoute({
+    create: createTicket,
+    list: listClientTickets,
+    get: getClientTicket,
+    reply: addClientReply,
+    close: closeClientTicket,
+  }),
+)
+app.route(
+  '/conversations',
+  createConversationsRoute({ list: listConversations, get: getConversation }),
+)
+
+// Próxima tarefa:
 // app.route('/staff/tickets', staffTickets)  + requireRole('technician', 'admin')
 
 app.notFound((c) => c.json({ error: 'Rota não encontrada.' }, 404))
