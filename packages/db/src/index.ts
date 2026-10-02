@@ -1,5 +1,11 @@
 export { db, type Database } from './client'
-export { consumeChatQuota, saveChatExchange, type ChatExchange } from './queries/chat'
+export {
+  consumeChatQuota,
+  saveChatExchange,
+  saveConversationFeedback,
+  type ChatExchange,
+  type ConversationFeedback,
+} from './queries/chat'
 export {
   addStaffReply,
   getStaffMetrics,

@@ -84,6 +84,8 @@ export async function saveChatExchange({
         .update(conversation)
         .set({
           updatedAt: new Date(),
+          // Mensagem nova reabre a conversa que estava marcada como resolvida.
+          status: 'open',
           ...(meta && {
             title: sql`coalesce(${conversation.title}, ${meta.title})`,
             kind: sql`coalesce(${conversation.kind}, ${meta.kind})`,
@@ -93,4 +95,43 @@ export async function saveChatExchange({
     ])
   }
   return targetId
+}
+
+export interface ConversationFeedback {
+  conversationId: string
+  userId: string
+  resolved: boolean
+  /** O que o cliente respondeu ("Resolveu" / "Não resolveu") e a resposta do Wen. */
+  answer: string
+  reply: string
+}
+
+/**
+ * Grava o "Resolveu" / "Não resolveu" como mensagens da conversa e atualiza o status. Devolve
+ * false se a conversa não existe ou é de outra pessoa.
+ */
+export async function saveConversationFeedback({
+  conversationId,
+  userId,
+  resolved,
+  answer,
+  reply,
+}: ConversationFeedback) {
+  const [own] = await db
+    .select({ id: conversation.id })
+    .from(conversation)
+    .where(and(eq(conversation.id, conversationId), eq(conversation.userId, userId)))
+    .limit(1)
+  if (!own) return false
+  await db.batch([
+    db.insert(conversationMessage).values([
+      { conversationId, role: 'user' as const, content: answer },
+      { conversationId, role: 'assistant' as const, content: reply, source: null },
+    ]),
+    db
+      .update(conversation)
+      .set({ updatedAt: new Date(), status: resolved ? 'resolved' : 'open' })
+      .where(eq(conversation.id, conversationId)),
+  ])
+  return true
 }

@@ -3,6 +3,7 @@
 import {
   CHAT_ROLES,
   CHAT_SOURCES,
+  CONVERSATION_STATUSES,
   DEFAULT_TICKET_PRIORITY,
   DEFAULT_TICKET_STATUS,
   REQUEST_KIND_IDS,
@@ -37,6 +38,7 @@ const updatedAt = () =>
 /**
  * Conversa com o chatbot. `user_id` nulo: visitante sem conta (a conversa fica só no navegador até virar chamado).
  * `title` e `kind` são definidos pelo bot na primeira troca gravada: a pergunta do FAQ ou o resumo do LLM.
+ * `status` vira `resolved` quando o cliente responde "Resolveu" e volta a `open` na mensagem seguinte.
  */
 export const conversation = pgTable(
   'conversation',
@@ -45,12 +47,14 @@ export const conversation = pgTable(
     userId: text('user_id').references(() => user.id, { onDelete: 'set null' }),
     title: text('title'),
     kind: text('kind', { enum: REQUEST_KIND_IDS }),
+    status: text('status', { enum: CONVERSATION_STATUSES }).default('open').notNull(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (table) => [
     index('conversation_user_id_updated_at_idx').on(table.userId, table.updatedAt.desc()),
     check('conversation_kind_check', oneOf(table.kind, REQUEST_KIND_IDS)),
+    check('conversation_status_check', oneOf(table.status, CONVERSATION_STATUSES)),
   ],
 )
 

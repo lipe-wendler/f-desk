@@ -1,5 +1,6 @@
 import type {
   ConversationDetail,
+  ConversationStatus,
   ConversationSummary,
   CreateTicketInput,
   TicketDetail,
@@ -41,4 +42,10 @@ export const conversationsApi = {
     )
   },
   get: (id: string) => apiFetch<ConversationDetail>(`/conversations/${encodeURIComponent(id)}`),
+  /** "Resolveu" / "Não resolveu": grava na conversa e devolve o status novo. */
+  feedback: (id: string, resolved: boolean) =>
+    apiFetch<{ status: ConversationStatus }>(`/conversations/${encodeURIComponent(id)}/feedback`, {
+      method: 'POST',
+      body: JSON.stringify({ resolved }),
+    }),
 }

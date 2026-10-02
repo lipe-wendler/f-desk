@@ -1,5 +1,12 @@
 import type { ChatExchange } from '@f-desk/db'
-import { CHAT_ERROR_REPLY, CHAT_FALLBACK_REPLY, findFaq, type ChatEvent } from '@f-desk/shared'
+import {
+  CHAT_ERROR_REPLY,
+  CHAT_FALLBACK_REPLY,
+  FAQ,
+  QUICK_SUGGESTIONS,
+  findFaq,
+  type ChatEvent,
+} from '@f-desk/shared'
 import { simulateReadableStream, type LanguageModel } from 'ai'
 import { MockLanguageModelV4 } from 'ai/test'
 import { Hono } from 'hono'
@@ -222,6 +229,42 @@ describe('POST /chat', () => {
       title: 'o sistema de notas fiscais mostra erro 503',
       kind: null,
     })
+  })
+
+  it('opção do atendimento guiado responde pela resposta pronta escolhida, sem LLM', async () => {
+    const { model, calls } = streamingModel(['não deveria aparecer'])
+    const describe = vi.fn()
+    const { app, saved } = setup({ model, user: { id: 'u1' }, describe })
+    const entry = findFaq('vpn')!
+    // Texto que a busca por palavras não ligaria à VPN: vale o id escolhido.
+    const { events } = await send(app, { message: entry.question, faqId: entry.id })
+    expect(events[0]).toEqual({ type: 'start', source: 'faq', faqId: 'vpn' })
+    expect(text(events)).toBe(entry.answer)
+    expect(calls).toHaveLength(0)
+    expect(describe).not.toHaveBeenCalled()
+    expect(saved[0]?.meta).toEqual({ title: entry.question, kind: entry.kind })
+  })
+
+  it('recusa faqId que não existe', async () => {
+    const { app, quotaKeys } = setup()
+    const { res } = await send(app, { message: 'oi', faqId: 'nao-existe' })
+    expect(res.status).toBe(400)
+    expect(quotaKeys).toHaveLength(0)
+  })
+
+  it('informa se o LLM está ligado', async () => {
+    const off = await setup({ model: null }).app.request('/chat/status')
+    expect(await off.json()).toEqual({ llm: false })
+    const on = await setup({ model: streamingModel(['x']).model }).app.request('/chat/status')
+    expect(await on.json()).toEqual({ llm: true })
+  })
+
+  it('atalhos e FAQ estão completos: todo id existe e toda entrada tem tipo', () => {
+    const ids = new Set(FAQ.map((e) => e.id))
+    for (const id of QUICK_SUGGESTIONS) expect(ids.has(id)).toBe(true)
+    for (const entry of FAQ) expect(entry.kind).toBeTruthy()
+    // Sem ids repetidos: as opções do fluxo e os atalhos chegam à API pelo id.
+    expect(ids.size).toBe(FAQ.length)
   })
 
   it('visitante não gera título (a conversa não é gravada)', async () => {

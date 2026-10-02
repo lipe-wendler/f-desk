@@ -1,5 +1,6 @@
 import type { RequestKind } from './request-kind'
 import { z } from 'zod'
+import { FAQ } from './faq'
 import { chatMessageSchema, type ChatSource } from './tickets'
 
 /** Tamanho máximo de uma mensagem digitada no chat. */
@@ -16,6 +17,13 @@ export const chatRequestSchema = z.object({
     .max(CHAT_INPUT_MAX, { error: `Use no máximo ${CHAT_INPUT_MAX} caracteres.` }),
   history: z.array(chatMessageSchema).max(CHAT_HISTORY_MAX).default([]),
   conversationId: z.uuid().optional(),
+  /** Resposta pronta escolhida no atendimento guiado: a API responde direto por ela, sem LLM. */
+  faqId: z
+    .string()
+    .refine((id) => FAQ.some((entry) => entry.id === id), {
+      error: 'Resposta pronta desconhecida.',
+    })
+    .optional(),
 })
 export type ChatRequest = z.infer<typeof chatRequestSchema>
 

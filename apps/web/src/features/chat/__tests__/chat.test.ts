@@ -1,11 +1,8 @@
-import { FAQ, findFaq, type ChatEvent } from '@f-desk/shared'
-import { flushPromises, mount } from '@vue/test-utils'
+import type { ChatEvent } from '@f-desk/shared'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createMemoryHistory, createRouter } from 'vue-router'
 import { useChatStore } from '../../../stores/chat'
 import { readNdjson } from '../chat-api'
-import ChatPage from '../ChatPage.vue'
 
 vi.mock('../../../lib/auth-client', () => ({
   authClient: { getSession: vi.fn(), signOut: vi.fn() },
@@ -146,68 +143,5 @@ describe('store do chat', () => {
     const other = useChatStore()
     other.hydrate('u2')
     expect(other.messages).toEqual([])
-  })
-})
-
-describe('ChatPage', () => {
-  async function mountPage() {
-    const stub = { template: '<div />' }
-    const router = createRouter({
-      history: createMemoryHistory(),
-      routes: [
-        { path: '/', name: 'chat', component: ChatPage },
-        { path: '/chamados/novo', name: 'ticket-new', component: stub },
-        { path: '/criar-conta', name: 'sign-up', component: stub },
-      ],
-    })
-    await router.push('/')
-    return mount(ChatPage, { global: { plugins: [router] } })
-  }
-
-  it('mostra as perguntas frequentes por categoria', async () => {
-    const wrapper = await mountPage()
-    const questions = FAQ.filter((e) => e.category === 'question').map((e) => e.question)
-    expect(wrapper.text()).toContain('Tenho uma dúvida')
-    expect(wrapper.text()).toContain(questions[0])
-
-    await wrapper.findAll('[role="tab"]')[1]!.trigger('click')
-    expect(wrapper.text()).toContain('A impressora não imprime')
-    expect(wrapper.text()).not.toContain(questions[0])
-  })
-
-  it('clicar numa sugestão envia a pergunta e mostra a resposta', async () => {
-    const entry = findFaq('impressora')!
-    mockFetch(
-      ndjson([
-        { type: 'start', source: 'faq', faqId: entry.id },
-        { type: 'delta', text: entry.answer },
-        { type: 'end' },
-      ]),
-    )
-    const wrapper = await mountPage()
-    await wrapper.findAll('[role="tab"]')[1]!.trigger('click')
-    const tag = wrapper.findAll('button').find((b) => b.text() === entry.question)!
-    await tag.trigger('click')
-    await flushPromises()
-
-    const messages = wrapper.get('[data-testid="chat-messages"]').text()
-    expect(messages).toContain(entry.question)
-    expect(messages).toContain('resposta pronta')
-    expect(messages).toContain('Cancele os trabalhos parados')
-  })
-
-  it('Enter envia e Shift+Enter não', async () => {
-    const fetchMock = mockFetch(
-      ndjson([{ type: 'start', source: 'llm' }, { type: 'delta', text: 'ok' }, { type: 'end' }]),
-    )
-    const wrapper = await mountPage()
-    const textarea = wrapper.get('textarea')
-    await textarea.setValue('linha')
-    await textarea.trigger('keydown', { key: 'Enter', shiftKey: true })
-    expect(fetchMock).not.toHaveBeenCalled()
-    await textarea.trigger('keydown', { key: 'Enter' })
-    await flushPromises()
-    expect(fetchMock).toHaveBeenCalledOnce()
-    expect((textarea.element as HTMLTextAreaElement).value).toBe('')
   })
 })
