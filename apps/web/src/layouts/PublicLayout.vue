@@ -13,7 +13,6 @@ const links = computed(() => {
     return [
       { label: 'Atendimento', to: '/atendimento' },
       { label: 'Meus chamados', to: '/chamados', match: '/chamados' },
-      { label: 'Conversas', to: '/conversas' },
     ]
   if (session.isStaff)
     return [

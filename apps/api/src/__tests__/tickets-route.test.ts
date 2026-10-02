@@ -175,6 +175,18 @@ describe('conversas', () => {
     await appAs(client).request('/conversations?page=2')
     expect(conversations.list).toHaveBeenCalledWith({ userId: 'c1', limit: 20, offset: 20 })
 
+    await appAs(client).request('/conversations?q=%20impressora%20&pageSize=30')
+    expect(conversations.list).toHaveBeenLastCalledWith({
+      userId: 'c1',
+      limit: 30,
+      offset: 0,
+      search: 'impressora',
+    })
+    // Busca vazia não filtra; busca longa demais é recusada.
+    await appAs(client).request('/conversations?q=%20%20')
+    expect(conversations.list.mock.lastCall?.[0]).not.toHaveProperty('search')
+    expect((await appAs(client).request(`/conversations?q=${'a'.repeat(101)}`)).status).toBe(400)
+
     expect((await appAs(client).request('/conversations/nao-e-uuid')).status).toBe(404)
     conversations.get.mockResolvedValue(null)
     const id = '11111111-1111-4111-8111-111111111111'

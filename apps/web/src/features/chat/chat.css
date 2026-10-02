@@ -1,0 +1,7 @@
+/* Atendimento: ajustes do chat sobre o design system. Só tokens. */
+
+/* Campo de digitação mais baixo: a tela tem altura fixa e a conversa precisa de espaço. */
+.chat-composer .fw-textarea {
+  min-height: 72px;
+  max-height: 30dvh;
+}

@@ -18,17 +18,24 @@ export const routes: RouteRecordRaw[] = [
       },
     ],
   },
+  // Atendimento em tela cheia: sidebar de conversas e chat. Público (visitante usa sem conta);
+  // `:conversa` abre uma conversa salva do cliente.
   {
     path: '/',
-    component: () => import('../layouts/PublicLayout.vue'),
+    component: () => import('../layouts/AppShellLayout.vue'),
     children: [
-      // Público: visitante tira dúvidas no chatbot sem criar conta.
       {
-        path: 'atendimento',
+        path: 'atendimento/:conversa?',
         name: 'chat',
         component: () => import('../features/chat/ChatPage.vue'),
         meta: { title: 'Atendimento' },
       },
+    ],
+  },
+  {
+    path: '/',
+    component: () => import('../layouts/PublicLayout.vue'),
+    children: [
       // Cliente logado: abrir chamado e histórico.
       {
         path: 'chamados',
