@@ -17,6 +17,15 @@ Navegador ──► Vercel (mesmo domínio)
     script `pnpm --filter api seed:admin`.
   - Permissões em `apps/api/src/auth/permissions.ts`; a API confere o perfil com `requireRole`, e o
     web só espelha isso nos guards do router (`apps/web/src/router/access.ts`).
+  - O perfil `admin` tem só o que a gestão de usuários usa: criar, listar, trocar perfil, redefinir
+    senha, desativar/reativar e encerrar sessões. Sem personificar nem apagar contas (contas são
+    desativadas para preservar o histórico de chamados).
+  - Regras extras no hook `before` do better-auth (`apps/api/src/auth/admin-guard.ts`, lógica em
+    `checkAdminChange` de `@f-desk/shared`): ninguém altera o próprio perfil nem se desativa, a
+    plataforma nunca fica sem admin ativo e só perfis válidos são aceitos.
+  - `/admin/usuarios`: a lista vem de `GET /api/admin/users` (busca sem diferenciar maiúsculas em nome
+    e e-mail, filtro por perfil, paginação); as alterações usam `/api/auth/admin/*`. Sem provedor de
+    e-mail ainda, a senha inicial é gerada na tela e o admin a repassa por um canal seguro.
 - **Chat sem login**: o visitante conversa com o chatbot sem conta; a conversa fica no navegador.
   Para abrir chamado, ele entra ou cria conta e a transcrição vai junto com o chamado.
   O chat público terá rate limit por IP guardado no Postgres (serverless não compartilha memória).
@@ -50,7 +59,7 @@ Status e prioridades ficam em `packages/shared/src/tickets.ts`.
 ## Roteiro
 
 1. ~~`feat/telas-de-login-e-cadastro`~~ — concluída
-2. `feat/gestao-de-usuarios-admin`
+2. ~~`feat/gestao-de-usuarios-admin`~~ — concluída
 3. `feat/modelo-de-chamados-e-conversas`
 4. `feat/chatbot-faq-e-llm`
 5. `feat/abertura-de-chamado-e-historico`
