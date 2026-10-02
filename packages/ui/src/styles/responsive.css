@@ -8,14 +8,13 @@
   .fw-header .fw-wordmark {
     font-size: 20px;
   }
+  /* No celular os atalhos ficam no menu do usuário; a marca leva à página inicial. */
   .fw-nav {
-    gap: var(--space-4);
-    min-width: 0;
-    overflow-x: auto;
-    scrollbar-width: none;
+    display: none;
   }
   .fw-header-actions {
     gap: var(--space-2);
+    margin-left: auto;
   }
   .fw-stepper {
     grid-auto-flow: row;

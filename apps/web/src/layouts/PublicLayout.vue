@@ -1,13 +1,12 @@
 <script setup lang="ts">
-import { FwAppHeader, FwButton, FwIconButton, FwTag } from '@f-desk/ui'
+import { FwAppHeader, FwButton } from '@f-desk/ui'
 import { computed } from 'vue'
-import { useRouter } from 'vue-router'
 import ThemeToggle from '../components/ThemeToggle.vue'
+import UserMenu from '../components/UserMenu.vue'
 import { useSessionStore } from '../stores/session'
 
 /** Layout do visitante e do cliente: chatbot, chamados e conversas. */
 const session = useSessionStore()
-const router = useRouter()
 
 const links = computed(() => {
   if (session.user?.role === 'client')
@@ -23,11 +22,6 @@ const links = computed(() => {
     ]
   return [{ label: 'Atendimento', to: '/' }]
 })
-
-async function signOut() {
-  await session.signOut()
-  await router.push({ name: 'chat' })
-}
 </script>
 
 <template>
@@ -35,10 +29,7 @@ async function signOut() {
     <FwAppHeader :links="links">
       <template #actions>
         <ThemeToggle />
-        <template v-if="session.user">
-          <FwTag size="sm" class="max-sm:hidden">{{ session.user.name }}</FwTag>
-          <FwIconButton icon="log-out" label="Sair" size="sm" @click="signOut" />
-        </template>
+        <UserMenu v-if="session.user" />
         <template v-else>
           <FwButton variant="ghost" size="sm" to="/entrar">Entrar</FwButton>
           <FwButton size="sm" to="/criar-conta" class="max-sm:hidden">Criar conta</FwButton>
