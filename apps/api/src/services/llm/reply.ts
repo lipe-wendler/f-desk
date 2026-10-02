@@ -6,6 +6,13 @@ import { WEN_INSTRUCTIONS } from './prompt'
 const HISTORY_LIMIT = 12
 const MAX_OUTPUT_TOKENS = 800
 
+/** Nota que vai junto da mensagem atual (e não nas instruções, para o prefixo seguir em cache). */
+export function contextNote(loggedIn: boolean) {
+  return loggedIn
+    ? 'Contexto do sistema: a pessoa já está logada como cliente.'
+    : 'Contexto do sistema: a pessoa é visitante, sem login.'
+}
+
 /**
  * Resposta da Wen em streaming. Devolve os pedaços de texto conforme chegam e lança o erro
  * do provedor (chave inválida, cota, indisponibilidade) para a rota tratar.
@@ -14,11 +21,17 @@ export async function* streamWenReply(
   model: LanguageModel,
   history: ChatMessage[],
   message: string,
-  abortSignal?: AbortSignal,
+  options: { loggedIn: boolean; abortSignal?: AbortSignal },
 ): AsyncGenerator<string> {
   const messages: ModelMessage[] = [
     ...history.slice(-HISTORY_LIMIT).map((m) => ({ role: m.role, content: m.content })),
-    { role: 'user', content: message },
+    {
+      role: 'user',
+      content: [
+        { type: 'text', text: contextNote(options.loggedIn) },
+        { type: 'text', text: message },
+      ],
+    },
   ]
 
   const result = streamText({
@@ -32,7 +45,7 @@ export async function* streamWenReply(
     messages,
     maxOutputTokens: MAX_OUTPUT_TOKENS,
     maxRetries: 1,
-    abortSignal,
+    abortSignal: options.abortSignal,
   })
 
   for await (const part of result.fullStream) {
