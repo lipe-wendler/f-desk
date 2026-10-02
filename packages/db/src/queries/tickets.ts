@@ -1,4 +1,4 @@
-import type { ChatMessage, TicketStatus } from '@f-desk/shared'
+import { ticketCreatedReply, type ChatMessage, type TicketStatus } from '@f-desk/shared'
 import { and, asc, count, desc, eq, inArray, sql, type SQL } from 'drizzle-orm'
 import { db } from '../client'
 import { conversation, conversationMessage, ticket, ticketMessage } from '../schema'
@@ -13,7 +13,17 @@ export interface NewTicket {
   transcript: ChatMessage[]
 }
 
-/** Abre o chamado e liga a conversa com a Wen (existente ou criada a partir da transcrição). */
+/** A fala de chamado aberto com o código vindo do banco (o código só existe depois do INSERT). */
+const [CREATED_BEFORE, CREATED_AFTER] = ticketCreatedReply('\u0000').split('\u0000') as [
+  string,
+  string,
+]
+
+/**
+ * Abre o chamado e liga a conversa (existente ou criada a partir da transcrição). Na conversa fica a
+ * fala do Wen que registra o chamado, ligada a ele, para o cartão do chamado continuar ali depois.
+ * Tudo num `batch`, que é transacional no driver HTTP: entra tudo junto ou nada.
+ */
 export async function createTicket({
   clientId,
   subject,
@@ -31,15 +41,27 @@ export async function createTicket({
     linkedId = own?.id ?? null
   }
 
+  const ticketId = crypto.randomUUID()
+  const returning = { id: ticket.id, code: ticket.code, conversationId: ticket.conversationId }
   const insertTicket = (convId: string | null) =>
     db
       .insert(ticket)
-      .values({ clientId, subject, description, conversationId: convId })
-      .returning({ id: ticket.id, code: ticket.code, conversationId: ticket.conversationId })
+      .values({ id: ticketId, clientId, subject, description, conversationId: convId })
+      .returning(returning)
+  const recordInConversation = (convId: string) =>
+    [
+      db.execute(sql`
+        insert into ${conversationMessage} (conversation_id, role, content, ticket_id)
+        select ${convId}::uuid, 'assistant', ${CREATED_BEFORE}::text || ${ticket.code} || ${CREATED_AFTER}::text, ${ticket.id}
+        from ${ticket} where ${ticket.id} = ${ticketId}`),
+      db
+        .update(conversation)
+        .set({ updatedAt: sql`now()` })
+        .where(eq(conversation.id, convId)),
+    ] as const
 
   if (!linkedId && transcript.length > 0) {
     const newId = crypto.randomUUID()
-    // `batch` é transacional no driver HTTP: chamado e conversa entram juntos ou nenhum entra.
     const [, , created] = await db.batch([
       db.insert(conversation).values({ id: newId, userId: clientId }),
       db
@@ -48,11 +70,17 @@ export async function createTicket({
           transcript.map((m) => ({ conversationId: newId, role: m.role, content: m.content })),
         ),
       insertTicket(newId),
+      ...recordInConversation(newId),
     ])
     return created[0]!
   }
 
-  const [created] = await insertTicket(linkedId)
+  if (linkedId) {
+    const [created] = await db.batch([insertTicket(linkedId), ...recordInConversation(linkedId)])
+    return created[0]!
+  }
+
+  const [created] = await insertTicket(null)
   return created!
 }
 
@@ -267,6 +295,7 @@ export async function getConversation(userId: string, id: string) {
       messages: {
         orderBy: asc(conversationMessage.id),
         columns: { role: true, content: true, source: true, createdAt: true },
+        with: { ticket: { columns: { code: true, subject: true } } },
       },
       tickets: { columns: { code: true, status: true } },
     },

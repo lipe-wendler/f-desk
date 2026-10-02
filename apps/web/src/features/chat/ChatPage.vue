@@ -21,6 +21,7 @@ import ChatHeader from './ChatHeader.vue'
 import ChatWelcome from './ChatWelcome.vue'
 import ChatBubble from './conversation/ChatBubble.vue'
 import OptionList from './conversation/OptionList.vue'
+import TicketCreatedCard from './conversation/TicketCreatedCard.vue'
 import TicketProposalCard from './conversation/TicketProposalCard.vue'
 import './chat.css'
 
@@ -324,8 +325,13 @@ async function newConversation() {
                     <FwIcon name="close" size="sm" />{{ GUIDED_FEEDBACK.unresolved.label }}
                   </button>
                 </div>
+                <TicketCreatedCard
+                  v-if="m.ticket"
+                  :code="m.ticket.code"
+                  :subject="m.ticket.subject"
+                />
                 <TicketProposalCard
-                  v-if="m.proposal?.state === 'created' || m.proposal?.state === 'dismissed'"
+                  v-if="m.proposal?.state === 'dismissed'"
                   :entry-id="m.id"
                   :proposal="m.proposal"
                 />

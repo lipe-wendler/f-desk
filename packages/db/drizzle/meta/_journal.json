@@ -36,6 +36,13 @@
       "when": 1790974961792,
       "tag": "0004_conversa-status",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790979245889,
+      "tag": "0005_conversa-mensagem-do-chamado",
+      "breakpoints": true
     }
   ]
 }

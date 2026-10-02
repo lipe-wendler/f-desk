@@ -68,9 +68,10 @@ Navegador ──► Vercel (mesmo domínio)
       volta ao campo. Confirmar chama `POST /api/tickets`,
       que confere o perfil. Visitante vê "Entre para abrirmos o seu chamado" e a conversa segue depois do
       login; a equipe vê que só clientes abrem chamados.
-    - Depois de aberto, o cartão mostra o código com link, o cabeçalho passa a "Chamado TKT-xxxx" e o Wen
-      registra na conversa que abriu o chamado (o LLM vê e não propõe outro). A proposta fica só no
-      navegador, junto com a conversa.
+    - Depois de aberto, o cabeçalho passa a "Chamado TKT-xxxx" e a API grava na conversa a fala do Wen
+      que registra o chamado (`ticketCreatedReply`), ligada a ele por `conversation_message.ticket_id`.
+      O cartão com o código e o link aparece sob essa fala, inclusive ao reabrir a conversa; o LLM vê a
+      fala e não propõe outro chamado. A proposta pendente ou descartada fica só no navegador.
   - **Limite:** 20 mensagens a cada 10 minutos por conta ou por IP, contado no Postgres
     (`chat_rate_limit`; serverless não compartilha memória). O IP é guardado como hash.
 
@@ -111,12 +112,12 @@ Schema em `packages/db/src/schema`; status, prioridades e papéis das mensagens 
 - **Limite do chat** (`chat.ts`): `chat_rate_limit` (key, window_start, count), janela fixa por chave.
 - **Chamados e conversas** (`tickets.ts`):
 
-| Tabela                 | Campos principais                                                                                                                                                       |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `conversation`         | id, user_id (nulo para visitante), title e kind (dados pelo bot; nulos nas antigas), status (`open`/`resolved`), created_at, updated_at                                 |
-| `conversation_message` | id (sequencial, define a ordem), conversation_id, role (`user`/`assistant`), content, source (`faq`/`llm`, só do assistente), created_at                                |
-| `ticket`               | id, number + code (`TKT-0001`, gerados pelo banco), client_id, assignee_id, subject, description, status, priority, conversation_id, created/updated/resolved/closed_at |
-| `ticket_message`       | id (sequencial), ticket_id, author_id, content, internal (nota só da equipe), created_at                                                                                |
+| Tabela                 | Campos principais                                                                                                                                                                        |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `conversation`         | id, user_id (nulo para visitante), title e kind (dados pelo bot; nulos nas antigas), status (`open`/`resolved`), created_at, updated_at                                                  |
+| `conversation_message` | id (sequencial, define a ordem), conversation_id, role (`user`/`assistant`), content, source (`faq`/`llm`, só do assistente), ticket_id (fala que registra o chamado aberto), created_at |
+| `ticket`               | id, number + code (`TKT-0001`, gerados pelo banco), client_id, assignee_id, subject, description, status, priority, conversation_id, created/updated/resolved/closed_at                  |
+| `ticket_message`       | id (sequencial), ticket_id, author_id, content, internal (nota só da equipe), created_at                                                                                                 |
 
 - **Código do chamado:** `number` é uma coluna identity e `code` é uma coluna gerada a partir dele
   (`formatTicketCode` no shared segue o mesmo formato). A numeração não depende de transação na API, o

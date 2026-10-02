@@ -12,6 +12,7 @@ import {
   type ChatReplySource,
   type RequestKind,
   type TicketProposal,
+  ticketCreatedReply,
 } from '@f-desk/shared'
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
@@ -39,6 +40,8 @@ export interface ChatEntry {
   createdAt?: string
   /** Chamado que o Wen preparou nesta resposta: só é aberto quando o cliente confirma. */
   proposal?: ProposalState
+  /** Fala que registra o chamado aberto pela conversa (gravada no servidor, com o cartão). */
+  ticket?: { code: string; subject: string }
 }
 
 export interface ProposalState extends TicketProposal {
@@ -50,10 +53,6 @@ export interface ProposalState extends TicketProposal {
 
 /** Limite de mensagens da transcrição que vai junto com o chamado (o mesmo da API). */
 const TRANSCRIPT_MAX = 100
-
-/** Fala do Wen depois que o chamado é aberto pela proposta. */
-export const ticketCreatedReply = (code: string) =>
-  `Abri o chamado ${code}. Um técnico vai assumir o caso, e você acompanha as respostas em Meus chamados.`
 
 /** Opção "Outro assunto" do atendimento guiado: libera o texto livre. */
 export const OTHER_OPTION = 'outro'
@@ -305,10 +304,12 @@ export const useChatStore = defineStore('chat', () => {
       partial.value = false
     }
     // Fica na conversa (não é passo local): o LLM sabe que o chamado já existe e não propõe outro.
+    // A API grava a mesma fala na conversa, ligada ao chamado: ao reabrir, o cartão continua aqui.
     messages.value.push({
       id: newId(),
       role: 'assistant',
       content: ticketCreatedReply(code),
+      ticket: { code, subject: input.subject },
       createdAt: now(),
     })
     return { ok: true, code }
@@ -338,6 +339,7 @@ export const useChatStore = defineStore('chat', () => {
       role: m.role,
       content: m.content,
       source: m.source ?? undefined,
+      ticket: m.ticket ?? undefined,
       createdAt: m.createdAt,
     }))
     status.value = data.status ?? 'open'

@@ -209,6 +209,10 @@ export interface ConversationDetail {
   title: string | null
   kind: RequestKind | null
   status: ConversationStatus
-  messages: (TranscriptMessage & { createdAt: string })[]
+  /** `ticket`: a fala que registra um chamado aberto pela conversa (o chat mostra o cartão nela). */
+  messages: (TranscriptMessage & {
+    createdAt: string
+    ticket: { code: string; subject: string } | null
+  })[]
   tickets: { code: string; status: TicketStatus }[]
 }

@@ -12,6 +12,7 @@ import {
 } from '@f-desk/shared'
 import { relations, sql, type AnyColumn } from 'drizzle-orm'
 import {
+  type AnyPgColumn,
   bigint,
   boolean,
   check,
@@ -62,7 +63,7 @@ export const conversation = pgTable(
  * Mensagem da conversa. O `id` sequencial define a ordem: a transcrição importada entra num único
  * INSERT e todas as linhas ficam com o mesmo `created_at`.
  * `source` só existe nas respostas do assistente (nulo quando a origem é desconhecida, como na
- * transcrição que vem do navegador).
+ * transcrição que vem do navegador, ou quando a fala registra um chamado aberto).
  */
 export const conversationMessage = pgTable(
   'conversation_message',
@@ -74,6 +75,8 @@ export const conversationMessage = pgTable(
     role: text('role', { enum: CHAT_ROLES }).notNull(),
     content: text('content').notNull(),
     source: text('source', { enum: CHAT_SOURCES }),
+    /** Fala do Wen que registra o chamado aberto pela conversa (o cartão do chamado aparece nela). */
+    ticketId: uuid('ticket_id').references((): AnyPgColumn => ticket.id, { onDelete: 'set null' }),
     createdAt: createdAt(),
   },
   (table) => [
@@ -163,6 +166,7 @@ export const conversationMessageRelations = relations(conversationMessage, ({ on
     fields: [conversationMessage.conversationId],
     references: [conversation.id],
   }),
+  ticket: one(ticket, { fields: [conversationMessage.ticketId], references: [ticket.id] }),
 }))
 
 export const ticketRelations = relations(ticket, ({ one, many }) => ({

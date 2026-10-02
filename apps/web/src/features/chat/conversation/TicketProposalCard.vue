@@ -15,7 +15,8 @@ import { useSessionStore } from '../../../stores/session'
 /**
  * Chamado que o Wen preparou. Nada é aberto sem o cliente: ele confere, ajusta se quiser e
  * confirma. Visitante precisa entrar (a conversa segue depois do login); a equipe não abre chamado.
- * Pendente, fica fixo acima do campo de mensagem; aberto ou descartado, vira um registro na conversa.
+ * Pendente, fica fixo acima do campo de mensagem; descartado, vira uma nota na conversa (o chamado
+ * aberto aparece em `TicketCreatedCard`, sob a fala do Wen que o registra).
  */
 type ConfirmResult = Awaited<ReturnType<ReturnType<typeof useChatStore>['confirmProposal']>>
 
@@ -101,17 +102,7 @@ function dismiss() {
     :aria-labelledby="titleId"
     data-testid="ticket-proposal"
   >
-    <template v-if="proposal.state === 'created'">
-      <p :id="titleId" class="chat-proposal-done">
-        <FwIcon name="check" size="sm" />Chamado {{ proposal.code }} aberto
-      </p>
-      <p class="m-0 text-sm font-semibold">{{ proposal.subject }}</p>
-      <RouterLink :to="`/chamados/${proposal.code}`" class="chat-link self-start">
-        Ver chamado
-      </RouterLink>
-    </template>
-
-    <template v-else-if="proposal.state === 'dismissed'">
+    <template v-if="proposal.state === 'dismissed'">
       <p :id="titleId" class="m-0 text-sm text-ink-muted">
         Proposta de chamado descartada. Se precisar, peça o chamado aqui na conversa.
       </p>

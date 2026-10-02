@@ -63,4 +63,8 @@ export const CHAT_TICKET_DETAILS_REPLY =
 export const CHAT_PROPOSAL_REPLY =
   'Não consegui resolver por aqui. Preparei um chamado para a equipe técnica: confira os dados abaixo e confirme.'
 
+/** Fala do Wen gravada na conversa quando o chamado é aberto pela proposta. */
+export const ticketCreatedReply = (code: string) =>
+  `Abri o chamado ${code}. Um técnico vai assumir o caso, e você acompanha as respostas em Meus chamados.`
+
 export const CHAT_ERROR_REPLY = 'Não consegui responder agora. Tente de novo em instantes.'

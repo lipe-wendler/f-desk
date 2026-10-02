@@ -1,10 +1,15 @@
-import type { ChatEvent, ChatMessage, ChatRequest } from '@f-desk/shared'
+import {
+  ticketCreatedReply,
+  type ChatEvent,
+  type ChatMessage,
+  type ChatRequest,
+} from '@f-desk/shared'
 import { flushPromises, mount } from '@vue/test-utils'
 import axe from 'axe-core'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
-import { ticketCreatedReply, useChatStore } from '../../../stores/chat'
+import { useChatStore } from '../../../stores/chat'
 import { useSessionStore, type SessionUser } from '../../../stores/session'
 import ChatPage from '../ChatPage.vue'
 import { resetAssistantStatus } from '../useAssistantStatus'
@@ -39,6 +44,40 @@ const proposalReply = (conversationId?: string): ChatEvent[] => [
 
 type ChatBody = ChatRequest & { history: ChatMessage[] }
 
+/** Como a API devolve a conversa depois do chamado aberto: a fala do Wen vem ligada ao chamado. */
+const savedConversation = {
+  id: CONVERSATION,
+  title: 'Erro 503 ao exportar notas',
+  kind: 'bug',
+  status: 'open',
+  createdAt: '2026-10-02T12:00:00.000Z',
+  updatedAt: '2026-10-02T12:05:00.000Z',
+  messages: [
+    {
+      role: 'user',
+      content: 'o sistema de notas mostra erro 503',
+      source: null,
+      createdAt: '2026-10-02T12:00:00.000Z',
+      ticket: null,
+    },
+    {
+      role: 'assistant',
+      content: 'Preparei um chamado para a equipe técnica.',
+      source: 'llm',
+      createdAt: '2026-10-02T12:00:00.000Z',
+      ticket: null,
+    },
+    {
+      role: 'assistant',
+      content: ticketCreatedReply('TKT-0042'),
+      source: null,
+      createdAt: '2026-10-02T12:05:00.000Z',
+      ticket: { code: 'TKT-0042', subject: PROPOSAL.subject },
+    },
+  ],
+  tickets: [{ code: 'TKT-0042', status: 'open' }],
+}
+
 function mockApi(opts: { create?: (body: unknown) => Response; loggedIn?: boolean } = {}) {
   const chatBodies: ChatBody[] = []
   const created: Record<string, unknown>[] = []
@@ -57,6 +96,7 @@ function mockApi(opts: { create?: (body: unknown) => Response; loggedIn?: boolea
       }
       if (url.pathname === '/api/tickets') return json({ tickets: [], total: 0 })
       if (url.pathname === '/api/conversations') return json({ conversations: [], total: 0 })
+      if (url.pathname === `/api/conversations/${CONVERSATION}`) return json(savedConversation)
       if (url.pathname === '/api/chat') {
         const body = JSON.parse(String(init?.body)) as ChatBody
         chatBodies.push(body)
@@ -166,6 +206,29 @@ describe('chamado preparado pelo Wen', () => {
       role: 'assistant',
       content: ticketCreatedReply('TKT-0042'),
     })
+  })
+
+  it('o chamado aberto continua na conversa ao sair e voltar para ela', async () => {
+    mockApi()
+    const { wrapper, router } = await mountPage(client)
+    await ask(wrapper)
+    await buttonByText(wrapper, 'Abrir chamado')!.trigger('click')
+    await flushPromises()
+
+    // Sai para uma conversa nova e volta pela URL: a conversa vem do servidor.
+    useChatStore().reset()
+    await router.push('/atendimento')
+    await flushPromises()
+    expect(wrapper.find('[data-testid="ticket-created"]').exists()).toBe(false)
+    await router.push(`/atendimento/${CONVERSATION}`)
+    await flushPromises()
+
+    const card = wrapper.get('[data-testid="ticket-created"]')
+    expect(card.text()).toContain('Chamado TKT-0042 aberto')
+    expect(card.text()).toContain(PROPOSAL.subject)
+    expect(card.get('a').attributes('href')).toBe('/chamados/TKT-0042')
+    expect(wrapper.text()).toContain(ticketCreatedReply('TKT-0042'))
+    expect(wrapper.text()).toContain('Chamado TKT-0042 · Aberto')
   })
 
   it('uma proposta nova substitui a anterior: só um box fica à espera', async () => {
