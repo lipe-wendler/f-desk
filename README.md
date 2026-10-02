@@ -14,7 +14,7 @@ técnico quando o caso precisa de acompanhamento humano.
 ## Stack
 
 Vue 3 + Vite + TypeScript + Tailwind CSS v4 · Hono · better-auth · Neon Postgres + Drizzle ORM ·
-Claude API · pnpm workspaces + Turborepo · Vercel.
+AI SDK (Gemini por padrão; Claude, OpenAI ou Grok) · pnpm workspaces + Turborepo · Vercel.
 
 ## Estrutura
 

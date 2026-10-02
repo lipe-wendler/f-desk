@@ -1,9 +1,14 @@
 import { Hono } from 'hono'
 import { logger } from 'hono/logger'
+import { consumeChatQuota, saveChatExchange } from '@f-desk/db'
 import { auth } from './auth'
+import { env } from './env'
 import { sessionMiddleware, type AppEnv } from './middleware/session'
 import { adminUsers } from './routes/admin-users'
+import { createChatRoute } from './routes/chat'
 import { health } from './routes/health'
+import { createLanguageModel, resolveLlmConfig } from './services/llm/models'
+import { createQuota } from './services/rate-limit'
 
 /**
  * App Hono do F.Desk, servido em `/api`.
@@ -23,8 +28,21 @@ app.use('*', sessionMiddleware)
 
 app.route('/admin/users', adminUsers)
 
+const llm = resolveLlmConfig(env.LLM_MODEL, env)
+if (!llm)
+  console.warn(`[chat] LLM desligado: confira LLM_MODEL (${env.LLM_MODEL}) e a chave do provedor.`)
+
+app.route(
+  '/chat',
+  createChatRoute({
+    model: llm ? createLanguageModel(llm) : null,
+    consumeQuota: createQuota(env.CHAT_RATE_LIMIT, env.CHAT_RATE_WINDOW_SECONDS, consumeChatQuota),
+    saveExchange: saveChatExchange,
+    secret: env.BETTER_AUTH_SECRET,
+  }),
+)
+
 // Próximas tarefas:
-// app.route('/chat', chat)                                          → público, com rate limit
 // app.route('/tickets', tickets)                                     → requireAuth
 // app.route('/staff/tickets', staffTickets)  + requireRole('technician', 'admin')
 
