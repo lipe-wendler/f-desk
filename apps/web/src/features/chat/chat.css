@@ -388,6 +388,45 @@ a.chat-conversation-status:hover {
   opacity: 0.6;
 }
 
+/* Chamado preparado pelo Wen: o cliente confere e confirma. */
+.chat-proposal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  width: min(560px, 100%);
+  margin-top: var(--space-2);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--line-strong);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  overflow-wrap: anywhere;
+}
+.chat-proposal-label,
+.chat-proposal-term {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--ink-muted);
+  font: 400 11px/16px var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.chat-proposal-done {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--success);
+  font: 600 15px/22px var(--font-sans);
+}
+.chat-proposal [tabindex='-1']:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
 /* Sugestões da tela inicial: quebram linha no desktop; no celular, uma linha com rolagem lateral. */
 .chat-suggestions {
   display: flex;

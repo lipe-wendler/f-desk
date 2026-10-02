@@ -2,12 +2,16 @@ import type { ChatExchange } from '@f-desk/db'
 import {
   CHAT_ERROR_REPLY,
   CHAT_FALLBACK_REPLY,
+  CHAT_PROPOSAL_REPLY,
   FAQ,
+  GUIDED_FEEDBACK,
   chatRequestSchema,
   fallbackTitle,
   fieldErrors,
+  proposalFromMessages,
   type ChatEvent,
   type ChatReplySource,
+  type TicketProposal,
 } from '@f-desk/shared'
 import type { LanguageModel } from 'ai'
 import { Hono } from 'hono'
@@ -16,6 +20,9 @@ import { matchFaq } from '../services/faq/match'
 import { describeConversation, type ConversationMeta } from '../services/llm/meta'
 import { streamWenReply } from '../services/llm/reply'
 import { clientIp, quotaKey, type ConsumeQuota } from '../services/rate-limit'
+
+/** Respostas do "Resolveu?" que ficam fora da descrição do chamado montado sem LLM. */
+const FEEDBACK_LABELS = new Set([GUIDED_FEEDBACK.resolved.label, GUIDED_FEEDBACK.unresolved.label])
 
 export interface ChatDeps {
   /** Modelo do LLM; `null` quando não há chave configurada (o chat responde só com o FAQ). */
@@ -72,18 +79,35 @@ export function createChatRoute(deps: ChatDeps) {
 
             send(faq ? { type: 'start', source, faqId: faq.entry.id } : { type: 'start', source })
             let reply = ''
+            let proposal: TicketProposal | undefined
             try {
               if (source === 'llm' && deps.model) {
-                for await (const text of streamWenReply(deps.model, history, message, {
+                for await (const part of streamWenReply(deps.model, history, message, {
                   loggedIn: Boolean(user),
                   abortSignal: signal,
                 })) {
-                  reply += text
-                  send({ type: 'delta', text })
+                  if (part.type === 'proposal') {
+                    proposal = { subject: part.subject, description: part.description }
+                    continue
+                  }
+                  reply += part.text
+                  send({ type: 'delta', text: part.text })
+                }
+                // O modelo só chamou a ferramenta: a conversa ainda precisa de uma fala do Wen.
+                if (proposal && !reply.trim()) {
+                  reply = CHAT_PROPOSAL_REPLY
+                  send({ type: 'delta', text: reply })
                 }
               } else {
                 reply = faq?.entry.answer ?? CHAT_FALLBACK_REPLY
                 send({ type: 'delta', text: reply })
+                // Sem LLM e sem resposta pronta: o chamado sai do que o cliente contou.
+                if (!faq)
+                  proposal = proposalFromMessages(
+                    [...history.filter((m) => m.role === 'user').map((m) => m.content), message]
+                      // "Resolveu" / "Não resolveu" do atendimento guiado não descrevem o problema.
+                      .filter((m) => !FEEDBACK_LABELS.has(m)),
+                  )
               }
             } catch (error) {
               if (!signal.aborted) console.error('[chat] falha ao gerar resposta', error)
@@ -129,6 +153,8 @@ export function createChatRoute(deps: ChatDeps) {
                 console.error('[chat] falha ao gravar a conversa', error)
               }
             }
+            // A proposta vai antes do fim; o chamado só é aberto quando o cliente confirmar.
+            if (proposal) send({ type: 'ticket-proposal', ...proposal })
             // Título e tipo só vão para a tela na conversa nova (numa existente o banco mantém os primeiros).
             send(
               savedId && meta && !conversationId

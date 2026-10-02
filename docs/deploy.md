@@ -130,7 +130,7 @@ não está cadastrada. A API valida o ambiente ao subir (`apps/api/src/env.ts`) 
 2. _Deployments_ → último deploy → **Redeploy** (variáveis novas só valem para deploys novos).
 3. `https://f-desk.vercel.app/api/health` deve responder `{"ok":true}`.
 
-### O chat só responde com o aviso para abrir chamado
+### O chat só responde com o aviso e a proposta de chamado
 
 Os logs mostram `[chat] LLM desligado`: falta a chave do provedor do `LLM_MODEL` ou o valor está fora do
 formato `<provedor>:<modelo>`. Cadastre a chave e faça um redeploy. Se aparecer `[chat] falha ao gerar

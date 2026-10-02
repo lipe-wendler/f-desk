@@ -36,31 +36,23 @@ export const routes: RouteRecordRaw[] = [
     path: '/',
     component: () => import('../layouts/PublicLayout.vue'),
     children: [
-      // Cliente logado: abrir chamado e histórico.
+      // Cliente logado: chamados abertos pelo atendimento.
       {
         path: 'chamados',
         name: 'tickets',
         component: () => import('../features/tickets/TicketsPage.vue'),
         meta: { roles: CLIENT, title: 'Meus chamados' },
       },
-      {
-        path: 'chamados/novo',
-        name: 'ticket-new',
-        component: () => import('../features/tickets/NewTicketPage.vue'),
-        meta: { roles: CLIENT, title: 'Abrir chamado' },
-      },
+      // O chamado nasce no atendimento (o Wen prepara e o cliente confirma): links antigos vão para lá.
+      { path: 'chamados/novo', redirect: { name: 'chat' } },
       {
         path: 'chamados/:id',
         name: 'ticket',
         component: () => import('../features/tickets/TicketPage.vue'),
         meta: { roles: CLIENT, title: 'Chamado' },
       },
-      {
-        path: 'conversas',
-        name: 'conversations',
-        component: () => import('../features/tickets/ConversationsPage.vue'),
-        meta: { roles: CLIENT, title: 'Minhas conversas' },
-      },
+      // O histórico de conversas fica na sidebar do atendimento.
+      { path: 'conversas', redirect: { name: 'chat' } },
       {
         path: 'acesso-negado',
         name: 'forbidden',

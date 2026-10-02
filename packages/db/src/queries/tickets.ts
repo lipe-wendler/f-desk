@@ -35,7 +35,7 @@ export async function createTicket({
     db
       .insert(ticket)
       .values({ clientId, subject, description, conversationId: convId })
-      .returning({ id: ticket.id, code: ticket.code })
+      .returning({ id: ticket.id, code: ticket.code, conversationId: ticket.conversationId })
 
   if (!linkedId && transcript.length > 0) {
     const newId = crypto.randomUUID()

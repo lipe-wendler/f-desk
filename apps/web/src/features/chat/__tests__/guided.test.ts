@@ -117,7 +117,6 @@ async function mountPage(user: SessionUser | null = null) {
     routes: [
       { path: '/atendimento/:conversa?', name: 'chat', component: ChatPage },
       { path: '/chamados', component: stub },
-      { path: '/chamados/novo', name: 'ticket-new', component: stub },
       { path: '/entrar', name: 'sign-in', component: stub },
       { path: '/tecnico', component: stub },
       { path: '/', component: stub },

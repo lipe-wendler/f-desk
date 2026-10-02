@@ -31,8 +31,8 @@ async function mountAt(component: object, path: string) {
       { path: '/', name: 'chat', component: stub },
       { path: '/entrar', name: 'sign-in', component: stub },
       { path: '/criar-conta', name: 'sign-up', component: stub },
-      { path: '/chamados/novo', name: 'ticket-new', component: stub },
       { path: '/tecnico', name: 'staff-dashboard', component: stub },
+      { path: '/chamados/:id', name: 'ticket', component: stub },
     ],
   })
   await router.push(path)
@@ -116,13 +116,13 @@ describe('SignInPage', () => {
   it('volta para o redirect depois do login', async () => {
     auth.signIn.mockResolvedValue({ data: {}, error: null })
     auth.getSession.mockResolvedValue(sessionOf('client'))
-    const { wrapper, router } = await mountAt(SignInPage, '/entrar?redirect=/chamados/novo')
+    const { wrapper, router } = await mountAt(SignInPage, '/entrar?redirect=/chamados/TKT-0001')
     await wrapper.find('input[type="email"]').setValue('ana@exemplo.com')
     await wrapper.find('input[type="password"]').setValue('12345678')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
     expect(auth.signIn).toHaveBeenCalledWith({ email: 'ana@exemplo.com', password: '12345678' })
-    expect(router.currentRoute.value.fullPath).toBe('/chamados/novo')
+    expect(router.currentRoute.value.fullPath).toBe('/chamados/TKT-0001')
   })
 
   it('leva técnico para o dashboard e ignora redirect externo', async () => {
@@ -160,7 +160,10 @@ describe('SignUpPage', () => {
   it('cria a conta sem enviar confirmPassword e volta para o redirect', async () => {
     auth.signUp.mockResolvedValue({ data: {}, error: null })
     auth.getSession.mockResolvedValue(sessionOf('client'))
-    const { wrapper, router } = await mountAt(SignUpPage, '/criar-conta?redirect=/chamados/novo')
+    const { wrapper, router } = await mountAt(
+      SignUpPage,
+      '/criar-conta?redirect=/chamados/TKT-0001',
+    )
     await fill(wrapper)
     await wrapper.find('form').trigger('submit')
     await flushPromises()
@@ -169,7 +172,7 @@ describe('SignUpPage', () => {
       email: 'ana@exemplo.com',
       password: 'segredo123',
     })
-    expect(router.currentRoute.value.fullPath).toBe('/chamados/novo')
+    expect(router.currentRoute.value.fullPath).toBe('/chamados/TKT-0001')
   })
 
   it('oferece entrar quando o e-mail já tem conta', async () => {
@@ -177,13 +180,13 @@ describe('SignUpPage', () => {
       data: null,
       error: { code: 'USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL', status: 422 },
     })
-    const { wrapper } = await mountAt(SignUpPage, '/criar-conta?redirect=/chamados/novo')
+    const { wrapper } = await mountAt(SignUpPage, '/criar-conta?redirect=/chamados/TKT-0001')
     await fill(wrapper)
     await wrapper.find('form').trigger('submit')
     await flushPromises()
     const alert = wrapper.find('[role="alert"]')
     expect(alert.text()).toContain('Já existe uma conta com esse e-mail.')
-    expect(alert.find('a').attributes('href')).toBe('/entrar?redirect=/chamados/novo')
+    expect(alert.find('a').attributes('href')).toBe('/entrar?redirect=/chamados/TKT-0001')
   })
 })
 

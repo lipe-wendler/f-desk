@@ -61,12 +61,9 @@ defineExpose({ focus: () => field.value?.focus() })
     <p v-if="error" :id="`${id}-erro`" class="m-0 text-xs text-danger" role="alert">
       {{ error }}
     </p>
-    <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-1">
-      <p :id="`${id}-dica`" class="m-0 font-mono text-[11px] text-ink-muted">
-        Enter para enviar<span class="max-sm:hidden"> · Shift + Enter para nova linha</span> · não
-        compartilhe senhas
-      </p>
-      <slot name="actions" />
-    </div>
+    <p :id="`${id}-dica`" class="m-0 px-1 font-mono text-[11px] text-ink-muted">
+      Enter para enviar<span class="max-sm:hidden"> · Shift + Enter para nova linha</span> · não
+      compartilhe senhas
+    </p>
   </div>
 </template>

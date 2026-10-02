@@ -8,7 +8,7 @@ import {
   type FaqCategory,
   type FaqEntry,
 } from '@f-desk/shared'
-import { FwButton, FwIcon, type IconName } from '@f-desk/ui'
+import { FwIcon, type IconName } from '@f-desk/ui'
 import { computed, nextTick, ref, useTemplateRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useToast } from '../../composables/useToast'
@@ -20,12 +20,14 @@ import ChatHeader from './ChatHeader.vue'
 import ChatWelcome from './ChatWelcome.vue'
 import ChatBubble from './conversation/ChatBubble.vue'
 import OptionList from './conversation/OptionList.vue'
+import TicketProposalCard from './conversation/TicketProposalCard.vue'
 import './chat.css'
 
 /**
  * Atendimento: qualquer visitante conversa com o Wen sem conta. A página ocupa a altura da tela e
  * só a conversa rola. Dúvida e problema começam pelo atendimento guiado (respostas prontas, sem
  * LLM); o texto livre vai para o LLM. Do cliente, `/atendimento/:conversa` abre uma conversa salva.
+ * Chamado só nasce aqui: quando o Wen não resolve, ele prepara um e o cliente confirma no cartão.
  */
 const chat = useChatStore()
 const session = useSessionStore()
@@ -197,6 +199,27 @@ async function feedback(entryId: string, resolved: boolean) {
   })
 }
 
+/** Chamado aberto pelo cartão: avisa o leitor de tela, sobe a conversa na lista e acerta a URL. */
+async function proposalCreated(code: string) {
+  announcement.value = `Chamado ${code} aberto.`
+  if (!chat.conversationId) return
+  conversations.touch({
+    id: chat.conversationId,
+    firstQuestion: chat.messages.find((m) => m.role === 'user' && !m.local)?.content ?? '',
+    lastMessage: chat.messages.at(-1)?.content ?? '',
+    title: chat.meta?.title,
+    kind: chat.meta?.kind,
+    ticketCode: code,
+    added: 0,
+  })
+  if (routeId.value !== chat.conversationId)
+    await router.replace({ name: 'chat', params: { conversa: chat.conversationId } })
+}
+
+function proposalDismissed() {
+  announcement.value = 'Proposta de chamado descartada.'
+}
+
 async function newConversation() {
   chat.reset()
   await router.push({ name: 'chat' })
@@ -265,6 +288,13 @@ async function newConversation() {
                     <FwIcon name="close" size="sm" />{{ GUIDED_FEEDBACK.unresolved.label }}
                   </button>
                 </div>
+                <TicketProposalCard
+                  v-if="m.proposal"
+                  :entry-id="m.id"
+                  :proposal="m.proposal"
+                  @created="proposalCreated"
+                  @dismissed="proposalDismissed"
+                />
               </ChatBubble>
             </li>
           </ol>
@@ -310,20 +340,7 @@ async function newConversation() {
           :sending="chat.sending"
           :error="chat.notice || undefined"
           @submit="send()"
-        >
-          <template #actions>
-            <!-- Até o Wen propor o chamado sozinho (tarefa 13). -->
-            <FwButton
-              v-if="hasMessages && !session.isStaff"
-              :to="{ name: 'ticket-new' }"
-              variant="ghost"
-              size="sm"
-              icon-left="plus"
-            >
-              Abrir chamado
-            </FwButton>
-          </template>
-        </ChatComposer>
+        />
       </div>
     </div>
   </div>

@@ -44,10 +44,15 @@ export type ChatEvent =
       title?: string
       kind?: RequestKind | null
     }
+  /** O Wen não resolveu e preparou um chamado: o cliente confere e confirma (nada é aberto sem ele). */
+  | { type: 'ticket-proposal'; subject: string; description: string }
   | { type: 'error'; message: string }
 
 export const CHAT_FALLBACK_REPLY =
-  'Não encontrei uma resposta pronta para isso. Para um técnico olhar o seu caso, abra um chamado e conte o que está acontecendo.'
+  'Não encontrei uma resposta pronta para isso. Preparei um chamado para um técnico olhar o seu caso: confira os dados abaixo e confirme.'
 
-export const CHAT_ERROR_REPLY =
-  'Não consegui responder agora. Tente de novo em instantes ou abra um chamado.'
+/** Texto da resposta quando o LLM só propõe o chamado, sem escrever nada antes. */
+export const CHAT_PROPOSAL_REPLY =
+  'Não consegui resolver por aqui. Preparei um chamado para a equipe técnica: confira os dados abaixo e confirme.'
+
+export const CHAT_ERROR_REPLY = 'Não consegui responder agora. Tente de novo em instantes.'

@@ -47,7 +47,7 @@ export function createTicketsRoute(store: ClientTicketStore) {
         return c.json({ error: 'Confira os campos.', fields: fieldErrors(parsed.error) }, 400)
       }
       const created = await store.create({ ...parsed.data, clientId: c.get('user')!.id })
-      return c.json({ code: created.code }, 201)
+      return c.json({ code: created.code, conversationId: created.conversationId }, 201)
     })
     .get('/', async (c) => {
       const parsed = listQuerySchema.safeParse(c.req.query())

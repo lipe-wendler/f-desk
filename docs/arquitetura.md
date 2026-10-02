@@ -49,15 +49,29 @@ Navegador ──► Vercel (mesmo domínio)
     - LLM: uma chamada curta extra (`services/llm/meta.ts`, até 4 s), só na conversa nova, pede título e
       tipo (`access`, `data`, `integration`, `question`, `bug`, `feature`);
     - sem nada disso (ou se a chamada falhar), a primeira mensagem cortada.
-  - Ao entrar na conta, a conversa do visitante segue no navegador e vai junto com o chamado
-    (abertura de chamado na tarefa 5).
+  - **Chamado pelo Wen:** não há botão nem formulário de abrir chamado; todo chamado nasce da conversa.
+    - LLM: o modelo tem a ferramenta `proporChamado` (sem `execute`, em `services/llm/reply.ts`). Ele a
+      chama quando não resolve, em caso de risco (hardware, perda de dados, invasão, acesso de admin) ou
+      quando a pessoa pede um técnico, e escreve assunto e descrição (`ticketProposalSchema`, os limites
+      do chamado). A rota repassa como o evento `{ type: 'ticket-proposal', subject, description }`, antes
+      do `end`. Se o modelo só chamar a ferramenta, o Wen fala `CHAT_PROPOSAL_REPLY`.
+    - Sem LLM e sem resposta pronta: a proposta sai de `proposalFromMessages` (a primeira fala do cliente
+      vira o assunto; tudo o que ele contou, a descrição).
+    - **Nada é aberto sem o cliente:** o cartão sob a bolha mostra assunto e descrição, com "Abrir
+      chamado", "Ajustar" (edição no próprio cartão) e "Agora não". Confirmar chama `POST /api/tickets`,
+      que confere o perfil. Visitante vê "Entre para abrirmos o seu chamado" e a conversa segue depois do
+      login; a equipe vê que só clientes abrem chamados.
+    - Depois de aberto, o cartão mostra o código com link, o cabeçalho passa a "Chamado TKT-xxxx" e o Wen
+      registra na conversa que abriu o chamado (o LLM vê e não propõe outro). A proposta fica só no
+      navegador, junto com a conversa.
   - **Limite:** 20 mensagens a cada 10 minutos por conta ou por IP, contado no Postgres
     (`chat_rate_limit`; serverless não compartilha memória). O IP é guardado como hash.
 
 - **Chamados do cliente** (`/api/tickets`, só `client`, só os próprios; de outra pessoa a resposta é 404):
-  - `POST /` abre o chamado. A conversa com a Wen vai junto: a gravada (`conversationId`) quando ela está
-    completa no servidor, ou a transcrição do navegador (visitante que entrou para abrir o chamado), que
-    vira uma conversa nova. Tudo num `batch` transacional.
+  - `POST /` abre o chamado (só pela proposta do Wen no atendimento). A conversa com a Wen vai junto: a
+    gravada (`conversationId`) quando ela está completa no servidor, ou a transcrição do navegador
+    (visitante que entrou para abrir o chamado), que vira uma conversa nova. Tudo num `batch`
+    transacional. Devolve o código e o id da conversa ligada, que passa a ser a do atendimento.
   - `GET /` (filtro `active`/`done`/`all`), `GET /:code` (mensagens sem as notas internas e a conversa de
     origem), `POST /:code/messages` e `POST /:code/close`.
   - Resposta do cliente em `waiting_client` ou `resolved` volta o chamado para `in_progress`; `closed` só
@@ -65,7 +79,7 @@ Navegador ──► Vercel (mesmo domínio)
 - **Conversas do cliente** (`/api/conversations`, só `client`): lista com título, tipo, última mensagem,
   primeira pergunta e o último chamado ligado (`q` busca no texto das mensagens, paginada por `page`/`pageSize`), e o detalhe com as
   mensagens. No atendimento, a sidebar lista as conversas por recência e `/atendimento/:conversa` abre
-  uma delas; em `/conversas`, qualquer conversa pode virar chamado.
+  uma delas.
 
 - **Dashboard da equipe** (`/api/staff`, só `technician` e `admin`):
   - `GET /metrics` (cards), `GET /assignees` (técnicos e admins ativos), `GET /tickets` (filas `active`,
@@ -113,7 +127,8 @@ Schema em `packages/db/src/schema`; status, prioridades e papéis das mensagens 
 | Rota                                                                     | Acesso                                                    |
 | ------------------------------------------------------------------------ | --------------------------------------------------------- |
 | `/` (landing page), `/atendimento/:conversa?`, `/entrar`, `/criar-conta` | Pública (entrar/criar conta só para quem não está logado) |
-| `/chamados`, `/chamados/novo`, `/chamados/:codigo`, `/conversas`         | `client`                                                  |
+| `/chamados`, `/chamados/:codigo`                                         | `client`                                                  |
+| `/chamados/novo`, `/conversas`                                           | Levam a `/atendimento` (o chamado nasce no chat)          |
 | `/tecnico`, `/tecnico/chamados/:id`                                      | `technician`, `admin`                                     |
 | `/admin/usuarios`                                                        | `admin`                                                   |
 | `/design-system`                                                         | Só em dev                                                 |
@@ -131,5 +146,5 @@ Schema em `packages/db/src/schema`; status, prioridades e papéis das mensagens 
 9. ~~`feat/identidade-visual-logo-e-simbolo`~~ — concluída
 10. ~~`feat/landing-page`~~ — concluída
 11. ~~`feat/sidebar-de-conversas-no-atendimento`~~ — concluída
-12. `feat/fluxos-guiados-e-novo-visual-do-chat`
-13. `feat/abertura-de-chamado-pelo-chatbot`
+12. ~~`feat/fluxos-guiados-e-novo-visual-do-chat`~~ — concluída
+13. ~~`feat/abertura-de-chamado-pelo-chatbot`~~ — concluída

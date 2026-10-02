@@ -21,10 +21,7 @@ const initials = computed(() => initialsOf(user.value?.name ?? ''))
 const links = computed(() => {
   switch (user.value?.role) {
     case 'client':
-      return [
-        { label: 'Meus chamados', to: '/chamados', icon: 'inbox' as const },
-        { label: 'Conversas', to: '/conversas', icon: 'message' as const },
-      ]
+      return [{ label: 'Meus chamados', to: '/chamados', icon: 'inbox' as const }]
     case 'technician':
       return [{ label: 'Dashboard', to: '/tecnico', icon: 'bar-chart' as const }]
     case 'admin':

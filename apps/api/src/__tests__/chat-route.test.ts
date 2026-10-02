@@ -2,7 +2,9 @@ import type { ChatExchange } from '@f-desk/db'
 import {
   CHAT_ERROR_REPLY,
   CHAT_FALLBACK_REPLY,
+  CHAT_PROPOSAL_REPLY,
   FAQ,
+  GUIDED_FEEDBACK,
   QUICK_SUGGESTIONS,
   findFaq,
   type ChatEvent,
@@ -41,6 +43,36 @@ function streamingModel(parts: string[]) {
     },
   })
   return { model, calls }
+}
+
+/** Modelo que escreve `parts` e chama `proporChamado` com `input` (texto JSON, como o provedor manda). */
+function proposingModel(parts: string[], input: unknown) {
+  return new MockLanguageModelV4({
+    doStream: async () => ({
+      stream: simulateReadableStream({
+        chunks: [
+          ...(parts.length
+            ? [
+                { type: 'text-start' as const, id: 't' },
+                ...parts.map((delta) => ({ type: 'text-delta' as const, id: 't', delta })),
+                { type: 'text-end' as const, id: 't' },
+              ]
+            : []),
+          {
+            type: 'tool-call' as const,
+            toolCallId: 'call-1',
+            toolName: 'proporChamado',
+            input: JSON.stringify(input),
+          },
+          {
+            type: 'finish' as const,
+            finishReason: { unified: 'tool-calls' as const, raw: undefined },
+            usage,
+          },
+        ],
+      }),
+    }),
+  })
 }
 
 const failingModel = new MockLanguageModelV4({
@@ -147,11 +179,81 @@ describe('POST /chat', () => {
     expect(JSON.stringify(prompt[0]!.content)).not.toContain('já está logada como cliente')
   })
 
-  it('sem LLM configurado, orienta a abrir chamado', async () => {
+  it('sem LLM configurado, prepara o chamado com o que o cliente contou', async () => {
     const { app } = setup({ model: null })
-    const { events } = await send(app, { message: 'o sistema de notas fiscais mostra erro 503' })
+    const { events } = await send(app, {
+      message: 'o sistema de notas fiscais mostra erro 503',
+      history: [
+        { role: 'user', content: 'Não consigo exportar as notas' },
+        { role: 'assistant', content: 'Qual erro aparece?' },
+        { role: 'user', content: GUIDED_FEEDBACK.unresolved.label },
+        { role: 'assistant', content: GUIDED_FEEDBACK.unresolved.reply },
+      ],
+    })
     expect(events[0]).toEqual({ type: 'start', source: 'fallback' })
     expect(text(events)).toBe(CHAT_FALLBACK_REPLY)
+    expect(events.at(-2)).toEqual({
+      type: 'ticket-proposal',
+      subject: 'Não consigo exportar as notas',
+      description:
+        'Relato do cliente no chat:\n- Não consigo exportar as notas\n- o sistema de notas fiscais mostra erro 503',
+    })
+    expect(events.at(-1)).toEqual({ type: 'end' })
+  })
+
+  it('resposta pronta não traz proposta de chamado', async () => {
+    const { app } = setup({ model: null })
+    const { events } = await send(app, { message: 'A impressora não imprime' })
+    expect(events.some((e) => e.type === 'ticket-proposal')).toBe(false)
+  })
+
+  it('quando o modelo chama proporChamado, a proposta vai antes do fim e nada é aberto', async () => {
+    const proposal = {
+      subject: 'Erro 503 ao exportar notas fiscais',
+      description: 'O cliente recebe erro 503 ao exportar notas fiscais desde ontem.',
+    }
+    const model = proposingModel(['Preparei um chamado para a equipe.'], proposal)
+    const { app, saved } = setup({ model, user: { id: 'u1' }, describe: async () => null })
+    const { events } = await send(app, {
+      message: 'o sistema de notas fiscais mostra erro 503 ao exportar',
+    })
+    expect(text(events)).toBe('Preparei um chamado para a equipe.')
+    expect(events.at(-2)).toEqual({ type: 'ticket-proposal', ...proposal })
+    expect(events.at(-1)).toMatchObject({ type: 'end' })
+    // Grava só a fala do Wen; o chamado depende da confirmação do cliente.
+    expect(saved[0]?.reply).toEqual({
+      content: 'Preparei um chamado para a equipe.',
+      source: 'llm',
+    })
+  })
+
+  it('se o modelo só chamar a ferramenta, o Wen ainda fala com o cliente', async () => {
+    const model = proposingModel([], {
+      subject: 'Conta bloqueada',
+      description: 'O cliente não consegue entrar mesmo depois de trocar a senha.',
+    })
+    const { app } = setup({ model })
+    const { events } = await send(app, { message: 'o relatório de vendas sai com valores errados' })
+    expect(text(events)).toBe(CHAT_PROPOSAL_REPLY)
+    expect(events.at(-2)).toMatchObject({ type: 'ticket-proposal', subject: 'Conta bloqueada' })
+  })
+
+  it('ignora proposta fora dos limites do chamado', async () => {
+    const model = proposingModel(['Vou ver isso.'], { subject: 'x', description: 'curta' })
+    const { app } = setup({ model })
+    const { events } = await send(app, { message: 'o sistema de notas fiscais mostra erro 503' })
+    expect(text(events)).toBe('Vou ver isso.')
+    expect(events.some((e) => e.type === 'ticket-proposal')).toBe(false)
+    expect(events.at(-1)).toEqual({ type: 'end' })
+  })
+
+  it('o prompt ensina a usar proporChamado e oferece a ferramenta ao modelo', async () => {
+    const { model, calls } = streamingModel(['ok'])
+    const { app } = setup({ model })
+    await send(app, { message: 'o sistema de notas fiscais mostra erro 503' })
+    const options = calls[0] as { prompt: { content: unknown }[]; tools?: { name: string }[] }
+    expect(String(options.prompt[0]!.content)).toContain('proporChamado')
+    expect(options.tools?.map((t) => t.name)).toEqual(['proporChamado'])
   })
 
   it('erro do provedor vira um evento de erro e nada é gravado', async () => {

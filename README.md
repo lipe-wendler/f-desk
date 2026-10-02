@@ -4,12 +4,12 @@ Sistema de tickets de suporte da **F.Wendler**. A Wen, assistente de IA, faz o p
 (respostas prontas para as perguntas frequentes + LLM para os casos fora do padrão) e escala para um
 técnico quando o caso precisa de acompanhamento humano.
 
-| Perfil                 | Como a conta nasce                           | O que acessa                                              |
-| ---------------------- | -------------------------------------------- | --------------------------------------------------------- |
-| Visitante              | —                                            | Chatbot para tirar dúvidas, sem login                     |
-| Cliente (`client`)     | Sozinho, pela tela de cadastro               | Chatbot, abrir chamado, histórico de conversas e chamados |
-| Técnico (`technician`) | Criada pelo admin                            | Dashboard e gestão de chamados                            |
-| Admin (`admin`)        | Seed do primeiro admin; os demais pelo admin | Tudo do técnico + gestão de usuários                      |
+| Perfil                 | Como a conta nasce                           | O que acessa                                                          |
+| ---------------------- | -------------------------------------------- | --------------------------------------------------------------------- |
+| Visitante              | —                                            | Chatbot para tirar dúvidas, sem login                                 |
+| Cliente (`client`)     | Sozinho, pela tela de cadastro               | Chatbot, chamado proposto pelo Wen, histórico de conversas e chamados |
+| Técnico (`technician`) | Criada pelo admin                            | Dashboard e gestão de chamados                                        |
+| Admin (`admin`)        | Seed do primeiro admin; os demais pelo admin | Tudo do técnico + gestão de usuários                                  |
 
 ## Stack
 

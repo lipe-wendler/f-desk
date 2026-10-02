@@ -23,7 +23,7 @@ export interface FaqEntry {
   answer: string
 }
 
-const TICKET_HINT = 'Se não resolver, abra um chamado e um técnico acompanha o caso.'
+const TICKET_HINT = 'Se não resolver, me conte aqui que eu preparo um chamado para um técnico.'
 
 export const FAQ: FaqEntry[] = [
   // Tenho uma dúvida
@@ -41,7 +41,7 @@ export const FAQ: FaqEntry[] = [
       'falar com uma pessoa',
     ],
     answer:
-      'Entre na sua conta (ou crie uma, leva menos de um minuto) e use o botão "Abrir chamado". Descreva o problema com o máximo de detalhes: o que aconteceu, quando começou e o que você já tentou. Se você conversou comigo antes, a conversa vai junto com o chamado.',
+      'Conte aqui na conversa o que está acontecendo: o que aconteceu, quando começou e o que você já tentou. Eu tento resolver primeiro; se não der, preparo um chamado com o que você contou, e você só confere e confirma. Para abrir é preciso estar logado (criar a conta leva menos de um minuto). A conversa vai junto com o chamado.',
   },
   {
     id: 'acompanhar-chamado',
@@ -131,7 +131,7 @@ export const FAQ: FaqEntry[] = [
       'fraude',
     ],
     answer:
-      'Não clique em links, não abra anexos e não responda. Desconfie de urgência, pedidos de senha, código ou pagamento e remetentes parecidos com os verdadeiros. Marque como spam ou phishing. Se você já clicou ou informou algum dado, troque a senha na hora e abra um chamado.',
+      'Não clique em links, não abra anexos e não responda. Desconfie de urgência, pedidos de senha, código ou pagamento e remetentes parecidos com os verdadeiros. Marque como spam ou phishing. Se você já clicou ou informou algum dado, troque a senha na hora e me avise aqui que eu preparo um chamado.',
   },
   {
     id: 'compartilhar-arquivos',
@@ -161,7 +161,7 @@ export const FAQ: FaqEntry[] = [
       'atualizar o mac',
     ],
     answer:
-      'Sim. As atualizações corrigem falhas de segurança e problemas conhecidos. Salve o que estiver aberto, instale e reinicie quando o sistema pedir. Se uma atualização travar ou falhar mais de uma vez, abra um chamado.',
+      'Sim. As atualizações corrigem falhas de segurança e problemas conhecidos. Salve o que estiver aberto, instale e reinicie quando o sistema pedir. Se uma atualização travar ou falhar mais de uma vez, me avise aqui que eu preparo um chamado.',
   },
   {
     id: 'instalar-programa',
@@ -170,7 +170,7 @@ export const FAQ: FaqEntry[] = [
     question: 'Posso instalar qualquer programa?',
     patterns: ['instalar programa', 'instalar software', 'baixar programa', 'instalar aplicativo'],
     answer:
-      'Baixe só do site oficial do fabricante ou da loja de apps do sistema. Evite versões "crackeadas": costumam trazer vírus e não têm licença. Se o computador for da empresa e pedir senha de administrador, abra um chamado para a instalação.',
+      'Baixe só do site oficial do fabricante ou da loja de apps do sistema. Evite versões "crackeadas": costumam trazer vírus e não têm licença. Se o computador for da empresa e pedir senha de administrador, me avise aqui que eu preparo um chamado para a instalação.',
   },
   {
     id: 'dados-chamado',
@@ -239,7 +239,7 @@ export const FAQ: FaqEntry[] = [
       'sem conexao',
     ],
     answer:
-      '1. Veja se outros aparelhos também estão sem internet.\n2. Desligue o roteador da tomada, espere 30 segundos e ligue de novo.\n3. Chegue mais perto do roteador ou use cabo, se puder.\n4. Desligue e ligue o Wi-Fi do computador.\nSe só um aparelho estiver com problema depois disso, abra um chamado.',
+      '1. Veja se outros aparelhos também estão sem internet.\n2. Desligue o roteador da tomada, espere 30 segundos e ligue de novo.\n3. Chegue mais perto do roteador ou use cabo, se puder.\n4. Desligue e ligue o Wi-Fi do computador.\nSe só um aparelho estiver com problema depois disso, me avise aqui que eu preparo um chamado.',
   },
   {
     id: 'computador-lento',
@@ -255,7 +255,7 @@ export const FAQ: FaqEntry[] = [
       'demora para abrir',
     ],
     answer:
-      '1. Reinicie o computador (reiniciar, não só fechar a tampa).\n2. Feche programas e abas do navegador que não está usando.\n3. Confira se há atualizações pendentes e instale.\n4. Veja se o disco está quase cheio e libere espaço.\nSe continuar lento mesmo assim, abra um chamado.',
+      '1. Reinicie o computador (reiniciar, não só fechar a tampa).\n2. Feche programas e abas do navegador que não está usando.\n3. Confira se há atualizações pendentes e instale.\n4. Veja se o disco está quase cheio e libere espaço.\nSe continuar lento mesmo assim, me avise aqui que eu preparo um chamado.',
   },
   {
     id: 'impressora',
@@ -298,7 +298,7 @@ export const FAQ: FaqEntry[] = [
       'tela preta',
     ],
     answer:
-      'Salve o que puder e tire uma foto da mensagem na tela. Se o computador não liga, confira o carregador e a tomada. Se ele desliga ou reinicia sozinho com frequência, pare de usar para tarefas importantes e abra um chamado: pode ser hardware ou aquecimento.',
+      'Salve o que puder e tire uma foto da mensagem na tela. Se o computador não liga, confira o carregador e a tomada. Se ele desliga ou reinicia sozinho com frequência, pare de usar para tarefas importantes e me avise aqui que eu preparo um chamado: pode ser hardware ou aquecimento.',
   },
   {
     id: 'audio-video-reuniao',
