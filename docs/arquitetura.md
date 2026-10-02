@@ -51,6 +51,19 @@ Navegador ──► Vercel (mesmo domínio)
 - **Conversas do cliente** (`/api/conversations`, só `client`): lista com a primeira pergunta e o último
   chamado ligado, e o detalhe com as mensagens. Na tela, qualquer conversa pode virar chamado.
 
+- **Dashboard da equipe** (`/api/staff`, só `technician` e `admin`):
+  - `GET /metrics` (cards), `GET /assignees` (técnicos e admins ativos), `GET /tickets` (filas `active`,
+    `mine`, `unassigned`, `done`, `all`, filtro de prioridade e busca por código, assunto, nome ou e-mail;
+    nas filas em aberto, urgente primeiro e, dentro da prioridade, o mais antigo).
+  - `GET /tickets/:code` (com notas internas e dados do cliente), `POST /tickets/:code/messages`
+    (resposta ou nota interna) e `PATCH /tickets/:code` (status, prioridade, responsável).
+  - Regras em `packages/shared/src/staff.ts`: transições de `TICKET_STATUS_TRANSITIONS`, chamado fechado
+    não muda, só técnico ou admin ativo pode ser responsável, e as datas de resolução e fechamento são
+    gravadas na mudança. A primeira resposta pública num chamado aberto o coloca em atendimento e, sem
+    responsável, atribui a quem respondeu. Nota interna não muda status nem a data de atualização.
+- **Contexto da Wen:** a mensagem atual vai com uma nota dizendo se a pessoa está logada (as instruções
+  fixas não mudam, para o prefixo continuar em cache).
+
 ## Modelo de dados
 
 Schema em `packages/db/src/schema`; status, prioridades e papéis das mensagens vêm de
@@ -96,5 +109,5 @@ Schema em `packages/db/src/schema`; status, prioridades e papéis das mensagens 
 3. ~~`feat/modelo-de-chamados-e-conversas`~~ — concluída
 4. ~~`feat/chatbot-faq-e-llm`~~ — concluída
 5. ~~`feat/abertura-de-chamado-e-historico`~~ — concluída
-6. `feat/dashboard-do-tecnico`
+6. ~~`feat/dashboard-do-tecnico`~~ — concluída
 7. `feat/recuperacao-de-senha-e-verificacao-de-email` (precisa de um provedor de e-mail)
