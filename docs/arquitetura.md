@@ -32,19 +32,30 @@ Navegador ──► Vercel (mesmo domínio)
 
 ## Modelo de dados
 
-Já existe (`packages/db/src/schema/auth.ts`): `user` (com `role`, `banned`…), `session`, `account`,
-`verification`, `rate_limit`.
+Schema em `packages/db/src/schema`; status, prioridades e papéis das mensagens vêm de
+`packages/shared/src/tickets.ts`, e os checks do banco usam as mesmas listas.
 
-Próximas tarefas (`feat/modelo-de-chamados-e-conversas`):
+- **Auth** (`auth.ts`, gerado pelo better-auth): `user` (com `role`, `banned`…), `session`, `account`,
+  `verification`, `rate_limit`.
+- **Chamados e conversas** (`tickets.ts`):
 
-| Tabela                 | Campos principais                                                                                                  |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `conversation`         | id, user_id (nulo para visitante), created_at                                                                      |
-| `conversation_message` | id, conversation_id, role (`user`/`assistant`), content, source (`faq`/`llm`), created_at                          |
-| `ticket`               | id, code (`TKT-0001`), client_id, assignee_id, subject, description, status, priority, conversation_id, timestamps |
-| `ticket_message`       | id, ticket_id, author_id, content, internal (nota só da equipe), created_at                                        |
+| Tabela                 | Campos principais                                                                                                                                                       |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `conversation`         | id, user_id (nulo para visitante), created_at, updated_at                                                                                                               |
+| `conversation_message` | id (sequencial, define a ordem), conversation_id, role (`user`/`assistant`), content, source (`faq`/`llm`, só do assistente), created_at                                |
+| `ticket`               | id, number + code (`TKT-0001`, gerados pelo banco), client_id, assignee_id, subject, description, status, priority, conversation_id, created/updated/resolved/closed_at |
+| `ticket_message`       | id (sequencial), ticket_id, author_id, content, internal (nota só da equipe), created_at                                                                                |
 
-Status e prioridades ficam em `packages/shared/src/tickets.ts`.
+- **Código do chamado:** `number` é uma coluna identity e `code` é uma coluna gerada a partir dele
+  (`formatTicketCode` no shared segue o mesmo formato). A numeração não depende de transação na API, o
+  que importa porque o driver HTTP do Neon não tem transação interativa.
+- **Ordem das mensagens:** pelo `id`, não pelo `created_at`. A transcrição anexada ao chamado entra num
+  único INSERT, e todas as linhas ficam com o mesmo horário.
+- **Histórico preservado:** `ticket.client_id` e `ticket_message.author_id` usam `restrict`; o
+  responsável e a conversa de origem viram `null` se forem apagados. Contas não são apagadas, só desativadas.
+- **Status:** `open` → `in_progress` / `waiting_client` → `resolved` → `closed`. `resolved` pode ser
+  reaberto; `closed` é final (as transições ficam em `TICKET_STATUS_TRANSITIONS`).
+- Datas das tabelas novas são `timestamp with time zone`; as do better-auth seguem como ele gera.
 
 ## Rotas do web
 
@@ -60,7 +71,7 @@ Status e prioridades ficam em `packages/shared/src/tickets.ts`.
 
 1. ~~`feat/telas-de-login-e-cadastro`~~ — concluída
 2. ~~`feat/gestao-de-usuarios-admin`~~ — concluída
-3. `feat/modelo-de-chamados-e-conversas`
+3. ~~`feat/modelo-de-chamados-e-conversas`~~ — concluída
 4. `feat/chatbot-faq-e-llm`
 5. `feat/abertura-de-chamado-e-historico`
 6. `feat/dashboard-do-tecnico`
