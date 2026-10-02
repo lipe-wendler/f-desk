@@ -1,5 +1,5 @@
 import { db, schema } from '@f-desk/db'
-import { DEFAULT_ROLE } from '@f-desk/shared'
+import { DEFAULT_ROLE, PASSWORD_MAX, PASSWORD_MIN } from '@f-desk/shared'
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { admin } from 'better-auth/plugins'
@@ -19,7 +19,8 @@ export const auth = betterAuth({
   database: drizzleAdapter(db, { provider: 'pg', schema }),
   emailAndPassword: {
     enabled: true,
-    minPasswordLength: 8,
+    minPasswordLength: PASSWORD_MIN,
+    maxPasswordLength: PASSWORD_MAX,
   },
   // Ativo só em produção (padrão do better-auth). Em serverless cada instância tem memória
   // própria, então o contador fica no Postgres.
