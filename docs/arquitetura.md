@@ -40,6 +40,17 @@ Navegador ──► Vercel (mesmo domínio)
   - **Limite:** 20 mensagens a cada 10 minutos por conta ou por IP, contado no Postgres
     (`chat_rate_limit`; serverless não compartilha memória). O IP é guardado como hash.
 
+- **Chamados do cliente** (`/api/tickets`, só `client`, só os próprios; de outra pessoa a resposta é 404):
+  - `POST /` abre o chamado. A conversa com a Wen vai junto: a gravada (`conversationId`) quando ela está
+    completa no servidor, ou a transcrição do navegador (visitante que entrou para abrir o chamado), que
+    vira uma conversa nova. Tudo num `batch` transacional.
+  - `GET /` (filtro `active`/`done`/`all`), `GET /:code` (mensagens sem as notas internas e a conversa de
+    origem), `POST /:code/messages` e `POST /:code/close`.
+  - Resposta do cliente em `waiting_client` ou `resolved` volta o chamado para `in_progress`; `closed` só
+    aceita leitura (409). O código `TKT-0001` é o identificador na URL.
+- **Conversas do cliente** (`/api/conversations`, só `client`): lista com a primeira pergunta e o último
+  chamado ligado, e o detalhe com as mensagens. Na tela, qualquer conversa pode virar chamado.
+
 ## Modelo de dados
 
 Schema em `packages/db/src/schema`; status, prioridades e papéis das mensagens vêm de
@@ -70,13 +81,13 @@ Schema em `packages/db/src/schema`; status, prioridades e papéis das mensagens 
 
 ## Rotas do web
 
-| Rota                                                         | Acesso                                                    |
-| ------------------------------------------------------------ | --------------------------------------------------------- |
-| `/`, `/entrar`, `/criar-conta`                               | Pública (entrar/criar conta só para quem não está logado) |
-| `/chamados`, `/chamados/novo`, `/chamados/:id`, `/conversas` | `client`                                                  |
-| `/tecnico`, `/tecnico/chamados/:id`                          | `technician`, `admin`                                     |
-| `/admin/usuarios`                                            | `admin`                                                   |
-| `/design-system`                                             | Só em dev                                                 |
+| Rota                                                             | Acesso                                                    |
+| ---------------------------------------------------------------- | --------------------------------------------------------- |
+| `/`, `/entrar`, `/criar-conta`                                   | Pública (entrar/criar conta só para quem não está logado) |
+| `/chamados`, `/chamados/novo`, `/chamados/:codigo`, `/conversas` | `client`                                                  |
+| `/tecnico`, `/tecnico/chamados/:id`                              | `technician`, `admin`                                     |
+| `/admin/usuarios`                                                | `admin`                                                   |
+| `/design-system`                                                 | Só em dev                                                 |
 
 ## Roteiro
 
@@ -84,6 +95,6 @@ Schema em `packages/db/src/schema`; status, prioridades e papéis das mensagens 
 2. ~~`feat/gestao-de-usuarios-admin`~~ — concluída
 3. ~~`feat/modelo-de-chamados-e-conversas`~~ — concluída
 4. ~~`feat/chatbot-faq-e-llm`~~ — concluída
-5. `feat/abertura-de-chamado-e-historico`
+5. ~~`feat/abertura-de-chamado-e-historico`~~ — concluída
 6. `feat/dashboard-do-tecnico`
 7. `feat/recuperacao-de-senha-e-verificacao-de-email` (precisa de um provedor de e-mail)

@@ -22,6 +22,8 @@ export interface ChatEntry {
 interface Persisted {
   ownerId: string | null
   conversationId?: string
+  /** Parte da conversa não está gravada no servidor (começou antes do login). */
+  partial?: boolean
   messages: ChatEntry[]
 }
 
@@ -47,6 +49,7 @@ export const useChatStore = defineStore('chat', () => {
   const messages = ref<ChatEntry[]>([])
   const conversationId = ref<string>()
   const ownerId = ref<string | null>(null)
+  const partial = ref(false)
   const sending = ref(false)
   const notice = ref('')
 
@@ -55,7 +58,10 @@ export const useChatStore = defineStore('chat', () => {
     const saved = load()
     const sameOwner = saved && (saved.ownerId === userId || saved.ownerId === null)
     messages.value = sameOwner ? saved.messages.filter((m) => !m.pending) : []
-    conversationId.value = sameOwner && saved.ownerId === userId ? saved.conversationId : undefined
+    const keepsId = sameOwner && saved.ownerId === userId
+    conversationId.value = keepsId ? saved.conversationId : undefined
+    // Conversa do visitante que segue após o login: o começo não está no servidor.
+    partial.value = keepsId ? Boolean(saved.partial) : messages.value.length > 0
     ownerId.value = userId
     // Grava já: a conversa passa a ser desta conta antes de qualquer troca de usuário.
     persist()
@@ -66,6 +72,7 @@ export const useChatStore = defineStore('chat', () => {
       const data: Persisted = {
         ownerId: ownerId.value,
         conversationId: conversationId.value,
+        partial: partial.value,
         messages: messages.value,
       }
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
@@ -74,7 +81,7 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  watch([messages, conversationId, ownerId], persist, { deep: true })
+  watch([messages, conversationId, ownerId, partial], persist, { deep: true })
 
   /** O que vai para a API como contexto e, na tarefa de chamados, junto com o chamado. */
   const transcript = computed<ChatMessage[]>(() =>
@@ -100,6 +107,9 @@ export const useChatStore = defineStore('chat', () => {
         if (event.type === 'start') reply.source = event.source
         else if (event.type === 'delta') reply.content += event.text
         else if (event.type === 'end') {
+          // Primeira gravação depois de mensagens que ficaram só no navegador.
+          if (event.conversationId && !conversationId.value && messages.value.length > 2)
+            partial.value = true
           if (event.conversationId) conversationId.value = event.conversationId
           reply.pending = false
         } else {
@@ -128,8 +138,30 @@ export const useChatStore = defineStore('chat', () => {
   function reset() {
     messages.value = []
     conversationId.value = undefined
+    partial.value = false
     notice.value = ''
   }
 
-  return { messages, conversationId, sending, notice, transcript, hydrate, send, reset }
+  /**
+   * O que mandar ao abrir chamado: o id da conversa gravada quando ela está completa no servidor;
+   * senão, a transcrição do navegador.
+   */
+  const ticketAttachment = computed(() =>
+    conversationId.value && !partial.value
+      ? { conversationId: conversationId.value, transcript: [] as ChatMessage[] }
+      : { conversationId: undefined, transcript: transcript.value },
+  )
+
+  return {
+    messages,
+    conversationId,
+    partial,
+    sending,
+    notice,
+    transcript,
+    ticketAttachment,
+    hydrate,
+    send,
+    reset,
+  }
 })
