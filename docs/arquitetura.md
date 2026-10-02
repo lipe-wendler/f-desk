@@ -10,6 +10,8 @@ Navegador ──► Vercel (mesmo domínio)
 - **Mesmo domínio para site e API** (rewrite na Vercel, proxy do Vite em dev): o cookie de sessão do
   better-auth é first-party, sem CORS nem `SameSite=None`.
 - **Auth self-hosted** com better-auth em `/api/auth/*`: e-mail/senha + plugin `admin`.
+  - Telas `/entrar` e `/criar-conta` validam com os schemas de `@f-desk/shared` (`signInSchema`,
+    `signUpSchema`) e voltam para o `?redirect=` só se ele for um caminho interno (`safeRedirect`).
   - Sign-up público cria sempre `client` (`defaultRole`; o campo `role` é recusado no cadastro).
   - Técnicos e admins são criados por um admin (`admin.createUser`); o primeiro admin vem do
     script `pnpm --filter api seed:admin`.
@@ -47,9 +49,10 @@ Status e prioridades ficam em `packages/shared/src/tickets.ts`.
 
 ## Roteiro
 
-1. `feat/telas-de-login-e-cadastro`
+1. ~~`feat/telas-de-login-e-cadastro`~~ — concluída
 2. `feat/gestao-de-usuarios-admin`
 3. `feat/modelo-de-chamados-e-conversas`
 4. `feat/chatbot-faq-e-llm`
 5. `feat/abertura-de-chamado-e-historico`
 6. `feat/dashboard-do-tecnico`
+7. `feat/recuperacao-de-senha-e-verificacao-de-email` (precisa de um provedor de e-mail)

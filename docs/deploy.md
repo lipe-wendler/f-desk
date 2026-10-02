@@ -65,3 +65,15 @@ pnpm --filter api seed:admin   # cria o primeiro admin (ADMIN_EMAIL / ADMIN_PASS
 - Skills da Neon em `.claude/skills/neon*` (atualize com `neon skills update`).
 - MCP da Neon em `.mcp.json`, fixado no projeto `divine-haze-24115227`. O login acontece no primeiro uso
   (OAuth), então nenhuma chave fica no repositório.
+
+## Problemas comuns
+
+### API respondendo 500 (`FUNCTION_INVOCATION_FAILED`)
+
+O site abre, mas `/api/*` falha e os logs da Vercel mostram `ZodError … BETTER_AUTH_SECRET`: a variável
+não está cadastrada. A API valida o ambiente ao subir (`apps/api/src/env.ts`) e não sobe sem ela.
+
+1. _Settings → Environment Variables_: `BETTER_AUTH_SECRET` (Production e Preview) e
+   `BETTER_AUTH_URL=https://f-desk.vercel.app` (só Production).
+2. _Deployments_ → último deploy → **Redeploy** (variáveis novas só valem para deploys novos).
+3. `https://f-desk.vercel.app/api/health` deve responder `{"ok":true}`.
