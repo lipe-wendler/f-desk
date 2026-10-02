@@ -15,6 +15,7 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import { requireRole } from '../middleware/require-role'
 import type { AppEnv } from '../middleware/session'
+import { limitPerUser, type ConsumeQuota } from '../services/rate-limit'
 
 /** Acesso ao banco usado pela rota (injetado para os testes rodarem sem Postgres). */
 export interface ClientTicketStore {
@@ -23,6 +24,14 @@ export interface ClientTicketStore {
   get: typeof getClientTicket
   reply: typeof addClientReply
   close: typeof closeClientTicket
+}
+
+/** Limites de escrita (no app são sempre passados; nos testes, só quando o teste é sobre eles). */
+export interface ClientTicketLimits {
+  /** Chamados abertos por janela. */
+  create?: ConsumeQuota
+  /** Respostas e encerramentos por janela. */
+  write?: ConsumeQuota
 }
 
 const listQuerySchema = z.object({
@@ -38,10 +47,10 @@ const CLOSED = { error: 'Este chamado está fechado. Se o problema voltou, abra 
  * Chamados do cliente: abrir, listar, ver, responder e encerrar. Só o perfil `client`, e só os
  * próprios chamados (de outra pessoa, a resposta é 404). Notas internas da equipe nunca saem daqui.
  */
-export function createTicketsRoute(store: ClientTicketStore) {
+export function createTicketsRoute(store: ClientTicketStore, limits: ClientTicketLimits = {}) {
   return new Hono<AppEnv>()
     .use('*', requireRole('client'))
-    .post('/', async (c) => {
+    .post('/', limitPerUser('ticket', limits.create), async (c) => {
       const parsed = createTicketSchema.safeParse(await c.req.json().catch(() => null))
       if (!parsed.success) {
         return c.json({ error: 'Confira os campos.', fields: fieldErrors(parsed.error) }, 400)
@@ -67,7 +76,7 @@ export function createTicketsRoute(store: ClientTicketStore) {
       const found = await store.get(c.get('user')!.id, code)
       return found ? c.json(found) : c.json(NOT_FOUND, 404)
     })
-    .post('/:code/messages', async (c) => {
+    .post('/:code/messages', limitPerUser('ticket-write', limits.write), async (c) => {
       const code = c.req.param('code')
       if (!TICKET_CODE_PATTERN.test(code)) return c.json(NOT_FOUND, 404)
       const parsed = ticketMessageSchema.safeParse(await c.req.json().catch(() => null))
@@ -80,7 +89,7 @@ export function createTicketsRoute(store: ClientTicketStore) {
         return result.reason === 'closed' ? c.json(CLOSED, 409) : c.json(NOT_FOUND, 404)
       return c.json({ status: result.status }, 201)
     })
-    .post('/:code/close', async (c) => {
+    .post('/:code/close', limitPerUser('ticket-write', limits.write), async (c) => {
       const code = c.req.param('code')
       if (!TICKET_CODE_PATTERN.test(code)) return c.json(NOT_FOUND, 404)
       const result = await store.close(c.get('user')!.id, code)

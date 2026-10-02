@@ -18,6 +18,7 @@ import {
 import { Hono } from 'hono'
 import { requireRole } from '../middleware/require-role'
 import type { AppEnv } from '../middleware/session'
+import { limitPerUser, type ConsumeQuota } from '../services/rate-limit'
 
 /** Acesso ao banco usado pela rota (injetado para os testes rodarem sem Postgres). */
 export interface StaffStore {
@@ -32,7 +33,7 @@ export interface StaffStore {
 const NOT_FOUND = { error: 'Chamado não encontrado.' }
 
 /** Dashboard da equipe (técnico e admin): fila, métricas e atendimento dos chamados. */
-export function createStaffRoute(store: StaffStore) {
+export function createStaffRoute(store: StaffStore, limits: { write?: ConsumeQuota } = {}) {
   return new Hono<AppEnv>()
     .use('*', requireRole(...STAFF_ROLES))
     .get('/metrics', async (c) => c.json(await store.metrics(c.get('user')!.id)))
@@ -57,7 +58,7 @@ export function createStaffRoute(store: StaffStore) {
       const found = await store.get(code)
       return found ? c.json(found) : c.json(NOT_FOUND, 404)
     })
-    .post('/tickets/:code/messages', async (c) => {
+    .post('/tickets/:code/messages', limitPerUser('staff-write', limits.write), async (c) => {
       const code = c.req.param('code')
       if (!TICKET_CODE_PATTERN.test(code)) return c.json(NOT_FOUND, 404)
       const parsed = ticketMessageSchema.safeParse(await c.req.json().catch(() => null))
@@ -73,7 +74,7 @@ export function createStaffRoute(store: StaffStore) {
       }
       return c.json({ status: result.status, assigneeId: result.assigneeId }, 201)
     })
-    .patch('/tickets/:code', async (c) => {
+    .patch('/tickets/:code', limitPerUser('staff-write', limits.write), async (c) => {
       const code = c.req.param('code')
       if (!TICKET_CODE_PATTERN.test(code)) return c.json(NOT_FOUND, 404)
       const parsed = updateTicketSchema.safeParse(await c.req.json().catch(() => null))

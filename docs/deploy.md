@@ -98,15 +98,17 @@ o campo `when` da entrada.
 
 ## Variáveis de ambiente
 
-| Variável                                               | Onde                              | Para quê                                                          |
-| ------------------------------------------------------ | --------------------------------- | ----------------------------------------------------------------- |
-| `DATABASE_URL`                                         | Production e Preview (integração) | Banco do Neon                                                     |
-| `BETTER_AUTH_SECRET`                                   | Production e Preview              | Sessões (`openssl rand -base64 32`); também gera o hash do IP     |
-| `BETTER_AUTH_URL`                                      | Só Production                     | Domínio final (`https://f-desk.vercel.app`)                       |
-| `LLM_MODEL`                                            | Opcional                          | Modelo do chat fora do FAQ; padrão `google:gemini-3.5-flash-lite` |
-| `GOOGLE_GENERATIVE_AI_API_KEY`                         | Production e Preview              | Chave do provedor do `LLM_MODEL` padrão                           |
-| `ANTHROPIC_API_KEY` · `OPENAI_API_KEY` · `XAI_API_KEY` | Só se `LLM_MODEL` usar o provedor | Chaves dos outros provedores                                      |
-| `CHAT_RATE_LIMIT` · `CHAT_RATE_WINDOW_SECONDS`         | Opcional                          | Limite do chat (padrão: 20 mensagens a cada 600 s)                |
+| Variável                                               | Onde                              | Para quê                                                                                               |
+| ------------------------------------------------------ | --------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `DATABASE_URL`                                         | Production e Preview (integração) | Banco do Neon                                                                                          |
+| `BETTER_AUTH_SECRET`                                   | Production e Preview              | Sessões (`openssl rand -base64 32`, um valor **diferente** em cada ambiente); também gera o hash do IP |
+| `BETTER_AUTH_URL`                                      | Só Production                     | Domínio final (`https://f-desk.vercel.app`)                                                            |
+| `LLM_MODEL`                                            | Opcional                          | Modelo do chat fora do FAQ; padrão `google:gemini-3.5-flash-lite`                                      |
+| `GOOGLE_GENERATIVE_AI_API_KEY`                         | Production e Preview              | Chave do provedor do `LLM_MODEL` padrão                                                                |
+| `ANTHROPIC_API_KEY` · `OPENAI_API_KEY` · `XAI_API_KEY` | Só se `LLM_MODEL` usar o provedor | Chaves dos outros provedores                                                                           |
+| `CHAT_RATE_LIMIT` · `CHAT_RATE_WINDOW_SECONDS`         | Opcional                          | Limite do chat (padrão: 20 mensagens a cada 600 s)                                                     |
+| `TICKET_CREATE_LIMIT`                                  | Opcional                          | Chamados abertos por hora, por cliente (padrão: 5)                                                     |
+| `TICKET_WRITE_LIMIT` · `STAFF_WRITE_LIMIT`             | Opcional                          | Escritas a cada 10 min do cliente (30) e de cada pessoa da equipe (120)                                |
 
 Para trocar o modelo do chat, mude `LLM_MODEL` (`<provedor>:<modelo>`, provedores `google`, `anthropic`,
 `openai` e `xai`), cadastre a chave do provedor e faça um redeploy. Sem a chave, o chat continua

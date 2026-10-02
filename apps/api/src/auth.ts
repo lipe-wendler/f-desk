@@ -24,9 +24,14 @@ export const auth = betterAuth({
     maxPasswordLength: PASSWORD_MAX,
   },
   // Ativo só em produção (padrão do better-auth). Em serverless cada instância tem memória
-  // própria, então o contador fica no Postgres.
+  // própria, então o contador fica no Postgres. Login e cadastro têm janelas mais longas que o
+  // padrão (3 a cada 10 s), que deixa ~18 senhas por minuto por IP num ataque de força bruta.
   rateLimit: {
     storage: 'database',
+    customRules: {
+      '/sign-in/email': { window: 300, max: 10 },
+      '/sign-up/email': { window: 3600, max: 5 },
+    },
   },
   advanced: {
     // Na Vercel, `x-real-ip` é definido pela borda com o IP real do visitante.

@@ -64,11 +64,14 @@ export async function createTicket({
     const newId = crypto.randomUUID()
     const [, , created] = await db.batch([
       db.insert(conversation).values({ id: newId, userId: clientId }),
-      db
-        .insert(conversationMessage)
-        .values(
-          transcript.map((m) => ({ conversationId: newId, role: m.role, content: m.content })),
-        ),
+      db.insert(conversationMessage).values(
+        transcript.map((m) => ({
+          conversationId: newId,
+          role: m.role,
+          content: m.content,
+          imported: true,
+        })),
+      ),
       insertTicket(newId),
       ...recordInConversation(newId),
     ])
@@ -158,7 +161,7 @@ export async function getClientTicket(clientId: string, code: string) {
         with: {
           messages: {
             orderBy: asc(conversationMessage.id),
-            columns: { role: true, content: true, source: true },
+            columns: { role: true, content: true, source: true, imported: true },
           },
         },
       },

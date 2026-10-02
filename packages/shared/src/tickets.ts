@@ -175,6 +175,8 @@ export interface TranscriptMessage {
   role: ChatRole
   content: string
   source: ChatSource | null
+  /** Enviada pelo navegador junto com o chamado (conversa de visitante): o texto não é verificado. */
+  imported?: boolean
 }
 
 export interface TicketDetail extends TicketSummary {

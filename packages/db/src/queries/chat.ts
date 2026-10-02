@@ -1,7 +1,10 @@
-import type { RequestKind } from '@f-desk/shared'
-import { and, eq, sql } from 'drizzle-orm'
+import type { ChatMessage, RequestKind } from '@f-desk/shared'
+import { and, desc, eq, lt, sql } from 'drizzle-orm'
 import { db } from '../client'
 import { chatRateLimit, conversation, conversationMessage } from '../schema'
+
+/** Fração das chamadas que também apagam as janelas expiradas (evita uma query extra em toda mensagem). */
+const PRUNE_CHANCE = 0.02
 
 /**
  * Conta mais uma mensagem para `key` numa janela fixa de `windowSeconds` (uma única query atômica).
@@ -20,6 +23,13 @@ export async function consumeChatQuota(key: string, windowSeconds: number) {
       },
     })
     .returning({ count: chatRateLimit.count, windowStart: chatRateLimit.windowStart })
+  // Faxina ocasional das janelas antigas (todas as janelas em uso são menores que um dia).
+  if (Math.random() < PRUNE_CHANCE) {
+    await db
+      .delete(chatRateLimit)
+      .where(lt(chatRateLimit.windowStart, sql`now() - interval '1 day'`))
+      .catch(() => undefined)
+  }
   const windowStart = row?.windowStart ?? new Date()
   return {
     count: row?.count ?? 1,
@@ -134,4 +144,29 @@ export async function saveConversationFeedback({
       .where(eq(conversation.id, conversationId)),
   ])
   return true
+}
+
+/**
+ * Últimas `limit` mensagens de uma conversa do usuário, da mais antiga para a mais nova, para servir
+ * de contexto ao LLM no lugar do histórico enviado pelo navegador (que o cliente pode editar).
+ * Devolve `null` se a conversa não existe ou é de outra pessoa.
+ */
+export async function getConversationHistory(
+  userId: string,
+  conversationId: string,
+  limit: number,
+): Promise<ChatMessage[] | null> {
+  const [own] = await db
+    .select({ id: conversation.id })
+    .from(conversation)
+    .where(and(eq(conversation.id, conversationId), eq(conversation.userId, userId)))
+    .limit(1)
+  if (!own) return null
+  const rows = await db
+    .select({ role: conversationMessage.role, content: conversationMessage.content })
+    .from(conversationMessage)
+    .where(eq(conversationMessage.conversationId, conversationId))
+    .orderBy(desc(conversationMessage.id))
+    .limit(limit)
+  return rows.reverse()
 }

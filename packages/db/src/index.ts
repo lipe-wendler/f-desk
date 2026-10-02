@@ -1,6 +1,7 @@
 export { db, type Database } from './client'
 export {
   consumeChatQuota,
+  getConversationHistory,
   saveChatExchange,
   saveConversationFeedback,
   type ChatExchange,
