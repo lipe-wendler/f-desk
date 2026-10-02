@@ -1,5 +1,14 @@
 branch="$(git rev-parse --abbrev-ref HEAD)"
 
+# O destino real de cada ref vem pela entrada padrão (`<ref local> <sha> <ref remota> <sha>`):
+# assim `git push origin HEAD:main` também é barrado, não só o push feito com a main em checkout.
+while read -r local_ref local_sha remote_ref remote_sha; do
+  if [ "$remote_ref" = "refs/heads/main" ]; then
+    echo "✖ Push direto na main não é permitido. Crie uma branch para a tarefa e abra um PR."
+    exit 1
+  fi
+done
+
 if [ "$branch" = "main" ]; then
   echo "✖ Push direto na main não é permitido. Crie uma branch para a tarefa e abra um PR."
   exit 1

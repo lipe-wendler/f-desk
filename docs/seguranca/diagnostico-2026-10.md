@@ -108,7 +108,7 @@ Configurações fora do código. Marque aqui quando aplicar.
       (`openssl rand -base64 32` para cada). Assim um cookie de produção não vale num preview.
 - [x] **Vercel → Deployment Protection:** ligar _Vercel Authentication_ nos previews (só quem é do time
       abre um preview).
-- [ ] **Neon → previews:** a integração Neon ↔ Vercel sempre copia o branch padrão (`production`) e
+- [x] **Neon → previews:** a integração Neon ↔ Vercel sempre copia o branch padrão (`production`) e
       não tem opção de branch só com schema. Enquanto a base for pequena e só o time abrir PRs, o risco
       fica contido pelo segredo separado e pelo Deployment Protection; garantir _Automatically delete
       obsolete Neon branches_ ligado (Neon Console → Integrations → Vercel → Manage → Settings). Com
@@ -116,9 +116,11 @@ Configurações fora do código. Marque aqui quando aplicar.
       ou anonimizados, criados por PR.
 - [x] **Vercel → Production:** `BETTER_AUTH_URL` definido com o domínio final (sem ele, a baseURL cai na
       URL do deploy).
-- [ ] **GitHub → Settings → Branches:** proteger a `main` com os checks `checks`, `branch-name` e
-      `pr-title` (já descrito em `docs/git-workflow.md`).
-- [ ] **GitHub → Settings → Code security:** ligar Dependabot alerts e secret scanning.
+- [ ] **GitHub → Settings → Rules:** ruleset da `main` criado, mas **inativo**: o GitHub só aplica
+      rulesets e branch protection em repositório privado nos planos pagos. Enquanto isso, o hook
+      `pre-push` barra push para a `main` (inclusive `HEAD:main`) e a `/revisao-de-seguranca` roda
+      antes de cada merge. Para ativar: GitHub Pro ou repositório público.
+- [x] **GitHub → Settings → Code security:** ligar Dependabot alerts e secret scanning.
 
 ## Como verificar
 
