@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { logger } from 'hono/logger'
 import { auth } from './auth'
 import { sessionMiddleware, type AppEnv } from './middleware/session'
+import { adminUsers } from './routes/admin-users'
 import { health } from './routes/health'
 
 /**
@@ -19,6 +20,8 @@ app.route('/health', health)
 
 // Demais rotas enxergam o usuário logado (ou null para visitantes).
 app.use('*', sessionMiddleware)
+
+app.route('/admin/users', adminUsers)
 
 // Próximas tarefas:
 // app.route('/chat', chat)                                          → público, com rate limit
