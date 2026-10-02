@@ -15,6 +15,7 @@ import {
   listConversations,
   listStaffTickets,
   saveChatExchange,
+  saveConversationFeedback,
   updateStaffTicket,
 } from '@f-desk/db'
 import { auth } from './auth'
@@ -73,7 +74,11 @@ app.route(
 )
 app.route(
   '/conversations',
-  createConversationsRoute({ list: listConversations, get: getConversation }),
+  createConversationsRoute({
+    list: listConversations,
+    get: getConversation,
+    feedback: saveConversationFeedback,
+  }),
 )
 
 app.route(

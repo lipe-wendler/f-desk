@@ -181,10 +181,20 @@ async function choose(entryId: string, optionId: string) {
   else await afterSaved(before, chat.messages.findLast((m) => m.role === 'user')?.content ?? '')
 }
 
-function feedback(entryId: string, resolved: boolean) {
-  chat.giveFeedback(entryId, resolved)
+async function feedback(entryId: string, resolved: boolean) {
+  const promise = chat.giveFeedback(entryId, resolved, { save: isClient.value })
   announceLast()
   if (!resolved) composer.value?.focus()
+  const saved = await promise
+  // Não gravou: a resposta foi desfeita, então o leitor de tela ouve o erro no lugar dela.
+  if (!saved) announcement.value = chat.notice
+  if (!saved || !chat.conversationId || !isClient.value) return
+  // Gravado: a conversa sobe na lista com a última fala.
+  conversations.touch({
+    id: chat.conversationId,
+    firstQuestion: chat.messages.find((m) => m.role === 'user' && !m.local)?.content ?? '',
+    lastMessage: chat.messages.at(-1)?.content ?? '',
+  })
 }
 
 async function newConversation() {
@@ -221,6 +231,12 @@ async function newConversation() {
                 <span class="size-2 rounded-pill bg-accent" aria-hidden="true" />
                 Chamado {{ ticket.code }} · {{ TICKET_STATUS_LABEL[ticket.status] }}
               </RouterLink>
+              <span
+                v-else-if="chat.status === 'resolved'"
+                class="chat-conversation-status chat-conversation-status-resolved"
+              >
+                <FwIcon name="check" size="sm" />Resolvido
+              </span>
               <span v-else class="chat-conversation-status">
                 <span class="size-2 rounded-pill bg-accent" aria-hidden="true" />Em andamento
               </span>

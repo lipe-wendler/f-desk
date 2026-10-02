@@ -262,7 +262,7 @@ export async function listConversations(params: {
 export async function getConversation(userId: string, id: string) {
   const found = await db.query.conversation.findFirst({
     where: and(eq(conversation.id, id), eq(conversation.userId, userId)),
-    columns: { id: true, title: true, kind: true, createdAt: true, updatedAt: true },
+    columns: { id: true, title: true, kind: true, status: true, createdAt: true, updatedAt: true },
     with: {
       messages: {
         orderBy: asc(conversationMessage.id),

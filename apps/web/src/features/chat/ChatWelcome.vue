@@ -7,8 +7,9 @@ import { useSessionStore } from '../../stores/session'
 import { ticketsApi } from '../tickets/tickets-api'
 
 /**
- * Tela inicial do atendimento: as três formas de começar (com atalhos 1, 2 e 3) e o caminho para a
- * equipe. Dúvida e problema abrem o atendimento guiado, sem LLM.
+ * Tela inicial do atendimento: as três formas de começar (com atalhos 1, 2 e 3). Dúvida e problema
+ * abrem o atendimento guiado, sem LLM. Não há atalho direto para a equipe: todo caso passa pelo Wen,
+ * que abre o chamado quando não resolve.
  */
 const emit = defineEmits<{ start: [category: FaqCategory] }>()
 const session = useSessionStore()
@@ -66,13 +67,6 @@ function onKeydown(event: KeyboardEvent) {
 }
 onMounted(() => document.addEventListener('keydown', onKeydown))
 onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown))
-
-const help = computed(() => {
-  if (session.isStaff) return null
-  return isClient.value
-    ? { to: { name: 'ticket-new' } }
-    : { to: { name: 'sign-in', query: { redirect: '/chamados/novo' } } }
-})
 </script>
 
 <template>
@@ -132,12 +126,5 @@ const help = computed(() => {
         </li>
       </ul>
     </section>
-
-    <p v-if="help" class="m-0 flex flex-wrap items-center gap-2 text-sm text-ink">
-      Precisa de ajuda da equipe?
-      <RouterLink :to="help.to" class="chat-link">
-        Falar com um atendente <FwIcon name="arrow-right" size="sm" />
-      </RouterLink>
-    </p>
   </div>
 </template>

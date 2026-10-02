@@ -1,3 +1,4 @@
+import { GUIDED_FEEDBACK } from '@f-desk/shared'
 import { Hono } from 'hono'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AppEnv } from '../middleware/session'
@@ -15,7 +16,7 @@ const store = {
   reply: vi.fn(),
   close: vi.fn(),
 } satisfies Record<keyof ClientTicketStore, ReturnType<typeof vi.fn>>
-const conversations = { list: vi.fn(), get: vi.fn() } satisfies Record<
+const conversations = { list: vi.fn(), get: vi.fn(), feedback: vi.fn() } satisfies Record<
   keyof ConversationStore,
   ReturnType<typeof vi.fn>
 >
@@ -170,6 +171,42 @@ describe('respostas e encerramento', () => {
 })
 
 describe('conversas', () => {
+  it('grava o "Resolveu" com os textos do atendimento guiado e devolve o status', async () => {
+    const id = '33333333-3333-4333-8333-333333333333'
+    conversations.feedback.mockResolvedValueOnce(true)
+    const res = await appAs(client).request(`/conversations/${id}/feedback`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ resolved: true }),
+    })
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ status: 'resolved' })
+    expect(conversations.feedback).toHaveBeenCalledWith({
+      conversationId: id,
+      userId: 'c1',
+      resolved: true,
+      answer: GUIDED_FEEDBACK.resolved.label,
+      reply: GUIDED_FEEDBACK.resolved.reply,
+    })
+  })
+
+  it('feedback de conversa alheia, id inválido ou corpo errado não grava', async () => {
+    const id = '33333333-3333-4333-8333-333333333333'
+    const post = (path: string, body: unknown) =>
+      appAs(client).request(path, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+    conversations.feedback.mockResolvedValueOnce(false)
+    expect((await post(`/conversations/${id}/feedback`, { resolved: false })).status).toBe(404)
+    expect((await post('/conversations/nao-e-uuid/feedback', { resolved: true })).status).toBe(404)
+    expect((await post(`/conversations/${id}/feedback`, { resolved: 'sim' })).status).toBe(400)
+    expect(
+      (await appAs(tech).request(`/conversations/${id}/feedback`, { method: 'POST' })).status,
+    ).toBe(403)
+  })
+
   it('lista e abre só as do cliente', async () => {
     conversations.list.mockResolvedValue({ conversations: [], total: 0 })
     await appAs(client).request('/conversations?page=2')

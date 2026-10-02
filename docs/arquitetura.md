@@ -36,8 +36,11 @@ Navegador ──► Vercel (mesmo domínio)
   - **Atendimento guiado** (`packages/shared/src/guided-flow.ts`): na tela inicial, "Tenho uma dúvida" e
     "Algo não está funcionando" mostram as perguntas do FAQ da categoria. A opção escolhida vai para a API
     com `faqId`, e a resposta sai direto daquela entrada, sem LLM e sem a busca por palavras. Os passos de
-    condução (categoria, "Isso resolveu?") ficam só no navegador e não vão para o LLM. "Outro assunto" e
-    "Não resolveu" levam ao texto livre, e aí o LLM entra.
+    condução (categoria, pergunta "Isso resolveu?") ficam só no navegador e não vão para o LLM. Não há
+    atalho direto para a equipe: todo caso passa pelo Wen primeiro.
+  - **"Resolveu" / "Não resolveu"** viram mensagens da conversa (`POST /api/conversations/:id/feedback`,
+    com os textos de `GUIDED_FEEDBACK`) e mudam `conversation.status` (`open` → `resolved`). Uma mensagem
+    nova reabre a conversa. "Outro assunto" e "Não resolveu" levam ao texto livre, e aí o LLM entra.
   - `GET /api/chat/status` diz se o LLM está ligado (selo "Wen disponível" ou "Só respostas prontas").
   - **Visitante:** a conversa fica só no navegador (`localStorage`). **Logado:** a API também grava
     pergunta e resposta em `conversation`/`conversation_message`, com a origem (`faq`/`llm`).
@@ -89,7 +92,7 @@ Schema em `packages/db/src/schema`; status, prioridades e papéis das mensagens 
 
 | Tabela                 | Campos principais                                                                                                                                                       |
 | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `conversation`         | id, user_id (nulo para visitante), title e kind (dados pelo bot; nulos nas antigas), created_at, updated_at                                                             |
+| `conversation`         | id, user_id (nulo para visitante), title e kind (dados pelo bot; nulos nas antigas), status (`open`/`resolved`), created_at, updated_at                                 |
 | `conversation_message` | id (sequencial, define a ordem), conversation_id, role (`user`/`assistant`), content, source (`faq`/`llm`, só do assistente), created_at                                |
 | `ticket`               | id, number + code (`TKT-0001`, gerados pelo banco), client_id, assignee_id, subject, description, status, priority, conversation_id, created/updated/resolved/closed_at |
 | `ticket_message`       | id (sequencial), ticket_id, author_id, content, internal (nota só da equipe), created_at                                                                                |

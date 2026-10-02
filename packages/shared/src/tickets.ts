@@ -1,4 +1,4 @@
-import type { RequestKind } from './request-kind'
+import type { ConversationStatus, RequestKind } from './request-kind'
 import { z } from 'zod'
 
 export const TICKET_STATUSES = [
@@ -189,6 +189,7 @@ export interface ConversationDetail {
   updatedAt: string
   title: string | null
   kind: RequestKind | null
+  status: ConversationStatus
   messages: (TranscriptMessage & { createdAt: string })[]
   tickets: { code: string; status: TicketStatus }[]
 }

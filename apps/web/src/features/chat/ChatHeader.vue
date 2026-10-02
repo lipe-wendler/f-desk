@@ -6,8 +6,8 @@ import { CONVERSATIONS_DRAWER } from './shell'
 import { useAssistantStatus } from './useAssistantStatus'
 
 /**
- * Barra do topo do atendimento: menu de conversas (celular), onde a pessoa está, o status do Wen,
- * o tema e a ajuda. Única barra da página, no desktop e no celular.
+ * Barra do topo do atendimento: menu de conversas (celular), onde a pessoa está, o status do Wen
+ * e o tema. Única barra da página, no desktop e no celular.
  */
 const props = defineProps<{ current: string }>()
 const emit = defineEmits<{ home: [] }>()
@@ -60,13 +60,5 @@ const isHome = computed(() => props.current === 'Início')
     </span>
     <span class="h-6 w-px bg-line max-sm:hidden" aria-hidden="true" />
     <ThemeToggle />
-    <RouterLink
-      :to="{ path: '/', hash: '#duvidas' }"
-      class="chat-header-btn"
-      aria-label="Ajuda"
-      title="Ajuda"
-    >
-      <FwIcon name="help" />
-    </RouterLink>
   </header>
 </template>

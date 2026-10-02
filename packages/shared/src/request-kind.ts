@@ -29,3 +29,7 @@ export function fallbackTitle(message: string): string {
   const space = cut.lastIndexOf(' ')
   return `${(space > 30 ? cut.slice(0, space) : cut).trimEnd()}…`
 }
+
+/** Situação da conversa: em andamento até o cliente marcar "Resolveu" (volta a aberta se ele escrever de novo). */
+export const CONVERSATION_STATUSES = ['open', 'resolved'] as const
+export type ConversationStatus = (typeof CONVERSATION_STATUSES)[number]

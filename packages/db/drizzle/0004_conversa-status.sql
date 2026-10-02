@@ -1,0 +1,2 @@
+ALTER TABLE "conversation" ADD COLUMN "status" text DEFAULT 'open' NOT NULL;--> statement-breakpoint
+ALTER TABLE "conversation" ADD CONSTRAINT "conversation_status_check" CHECK ("conversation"."status" in ('open', 'resolved'));

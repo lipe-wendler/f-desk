@@ -1,10 +1,11 @@
 <script setup lang="ts">
+import { formatMessageTime } from '../../../lib/format'
 import type { ChatEntry } from '../../../stores/chat'
 import TypingDots from './TypingDots.vue'
 
 /**
  * Uma fala da conversa. Cliente: amarelo, à direita. Wen: cinza, à esquerda, com o avatar.
- * O nome de quem fala vai em texto para leitores de tela (o avatar é decorativo).
+ * O nome de quem fala vai em texto para leitores de tela (o avatar é decorativo). Embaixo, o horário.
  */
 defineProps<{ entry: ChatEntry }>()
 </script>
@@ -34,10 +35,11 @@ defineProps<{ entry: ChatEntry }>()
         <TypingDots v-if="entry.pending && !entry.content" />
         <template v-else>{{ entry.content }}</template>
       </p>
-      <span
-        v-if="entry.source === 'faq' && !entry.pending"
-        class="font-mono text-[11px] tracking-[0.08em] text-ink-muted"
-        >resposta pronta</span
+      <time
+        v-if="entry.createdAt && !entry.pending"
+        :datetime="entry.createdAt"
+        class="font-mono text-[11px] text-ink-muted"
+        >{{ formatMessageTime(entry.createdAt) }}</time
       >
       <slot />
     </div>

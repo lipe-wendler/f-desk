@@ -22,6 +22,7 @@ vi.mock('../../../lib/auth-client', () => ({
 }))
 
 const client: SessionUser = { id: 'c1', name: 'Marina Souza', email: 'm@x.com', role: 'client' }
+const CONVERSATION = '11111111-1111-4111-8111-111111111111'
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
@@ -59,9 +60,15 @@ const ndjson = (events: ChatEvent[]) =>
 type ChatBody = ChatRequest & { history: ChatMessage[] }
 
 function mockApi(
-  opts: { llm?: boolean; waiting?: number; chat?: (body: ChatBody) => Response } = {},
+  opts: {
+    llm?: boolean
+    waiting?: number
+    chat?: (body: ChatBody) => Response
+    feedback?: (resolved: boolean) => Response
+  } = {},
 ) {
   const chatBodies: ChatBody[] = []
+  const feedbackBodies: { resolved: boolean }[] = []
   const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
     const url = new URL(input, 'http://localhost')
     if (url.pathname === '/api/chat/status') return json({ llm: opts.llm ?? true })
@@ -73,6 +80,22 @@ function mockApi(
         })),
         total: opts.waiting ?? 0,
       })
+    if (url.pathname.endsWith('/feedback')) {
+      const body = JSON.parse(String(init?.body)) as { resolved: boolean }
+      feedbackBodies.push(body)
+      return opts.feedback?.(body.resolved) ?? json({ status: body.resolved ? 'resolved' : 'open' })
+    }
+    if (url.pathname.startsWith('/api/conversations/'))
+      return json({
+        id: CONVERSATION,
+        title: null,
+        kind: null,
+        status: 'open',
+        createdAt: '',
+        updatedAt: '',
+        messages: [],
+        tickets: [],
+      })
     if (url.pathname === '/api/chat') {
       const body = JSON.parse(String(init?.body)) as ChatBody
       chatBodies.push(body)
@@ -81,7 +104,7 @@ function mockApi(
     return json(null)
   })
   vi.stubGlobal('fetch', fetchMock)
-  return { fetchMock, chatBodies }
+  return { fetchMock, chatBodies, feedbackBodies }
 }
 
 async function mountPage(user: SessionUser | null = null) {
@@ -202,14 +225,18 @@ describe('atendimento guiado', () => {
     stream.finish(faqReply('impressora'))
     await flushPromises()
     expect(wrapper.find('.chat-typing').exists()).toBe(false)
-    expect(wrapper.text()).toContain('resposta pronta')
+    expect(wrapper.text()).not.toContain('resposta pronta')
     expect(wrapper.text()).toContain(GUIDED_FEEDBACK.question)
+    // Cada fala mostra o horário de envio, do cliente e do Wen.
+    const times = wrapper.findAll('[data-testid="chat-messages"] time')
+    expect(times.length).toBe(wrapper.findAll('.chat-bubble').length)
+    expect(times.at(-1)!.text()).toMatch(/^\d{2}:\d{2}$/)
     // A resposta inteira vai para a região lida pelos leitores de tela.
     const answer = FAQ.find((e) => e.id === 'impressora')!.answer
     expect(wrapper.get('p[aria-live="polite"]').text()).toBe(`Wen: ${answer}`)
   })
 
-  it('"Não resolveu" responde localmente e devolve o foco ao campo', async () => {
+  it('"Não resolveu" entra na conversa e devolve o foco ao campo', async () => {
     const { chatBodies } = mockApi()
     const { wrapper } = await mountPage()
     await buttonByText(wrapper, GUIDED_FLOWS.problem.label).trigger('click')
@@ -222,10 +249,12 @@ describe('atendimento guiado', () => {
     expect(wrapper.text()).not.toContain(GUIDED_FEEDBACK.question)
     expect(document.activeElement).toBe(wrapper.get('textarea').element)
     expect(chatBodies).toHaveLength(1)
-    // Os passos locais ficam fora do que vai para o LLM.
+    // Os passos de condução ficam fora do que vai para o LLM; o feedback entra, como contexto.
     expect(useChatStore().transcript.map((m) => m.content)).toEqual([
       'A impressora não imprime',
       FAQ.find((e) => e.id === 'impressora')!.answer,
+      GUIDED_FEEDBACK.unresolved.label,
+      GUIDED_FEEDBACK.unresolved.reply,
     ])
   })
 
@@ -257,6 +286,52 @@ describe('atendimento guiado', () => {
     await flushPromises()
     expect(useChatStore().messages).toHaveLength(0)
     expect(wrapper.get('h1').text()).toBe('Como podemos ajudar você?')
+  })
+
+  it('cliente: "Resolveu" fica gravado na conversa e o status vira Resolvido', async () => {
+    const reply = faqReply('impressora')
+    const end = reply.at(-1) as Extract<ChatEvent, { type: 'end' }>
+    end.conversationId = CONVERSATION
+    const { feedbackBodies } = mockApi({ chat: () => ndjson(reply) })
+    const { wrapper } = await mountPage(client)
+    await buttonByText(wrapper, GUIDED_FLOWS.problem.label).trigger('click')
+    await buttonByText(wrapper, 'A impressora não imprime').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Em andamento')
+
+    await buttonByText(wrapper, GUIDED_FEEDBACK.resolved.label).trigger('click')
+    await flushPromises()
+    expect(feedbackBodies).toEqual([{ resolved: true }])
+    expect(wrapper.text()).toContain(GUIDED_FEEDBACK.resolved.reply)
+    expect(wrapper.text()).toContain('Resolvido')
+    expect(wrapper.text()).not.toContain('Em andamento')
+    expect(useChatStore().status).toBe('resolved')
+  })
+
+  it('se a gravação do feedback falha, desfaz e mostra o erro', async () => {
+    const reply = faqReply('impressora')
+    ;(reply.at(-1) as Extract<ChatEvent, { type: 'end' }>).conversationId = CONVERSATION
+    mockApi({
+      chat: () => ndjson(reply),
+      feedback: () => json({ error: 'Conversa não encontrada.' }, 404),
+    })
+    const { wrapper } = await mountPage(client)
+    await buttonByText(wrapper, GUIDED_FLOWS.problem.label).trigger('click')
+    await buttonByText(wrapper, 'A impressora não imprime').trigger('click')
+    await flushPromises()
+    await buttonByText(wrapper, GUIDED_FEEDBACK.resolved.label).trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).not.toContain(GUIDED_FEEDBACK.resolved.reply)
+    expect(wrapper.text()).toContain(GUIDED_FEEDBACK.question)
+    expect(wrapper.text()).toContain('Conversa não encontrada.')
+    expect(useChatStore().status).toBe('open')
+  })
+
+  it('não há atalho direto para a equipe nem botão de ajuda no topo', async () => {
+    mockApi()
+    const { wrapper } = await mountPage(client)
+    expect(wrapper.text()).not.toContain('Falar com um atendente')
+    expect(wrapper.find('header a[aria-label="Ajuda"]').exists()).toBe(false)
   })
 
   it('tela inicial e conversa guiada não têm violações detectáveis pelo axe', async () => {

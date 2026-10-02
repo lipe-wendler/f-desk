@@ -265,6 +265,9 @@
   font: 500 14px/20px var(--font-sans);
   text-decoration: none;
 }
+.chat-conversation-status-resolved {
+  color: var(--success);
+}
 a.chat-conversation-status:hover {
   text-decoration: underline;
 }
