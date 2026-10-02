@@ -104,13 +104,17 @@ O que já estava bom e continua valendo:
 
 Configurações fora do código. Marque aqui quando aplicar.
 
-- [ ] **Vercel → Environment Variables:** `BETTER_AUTH_SECRET` **diferente** em Preview e Production
+- [x] **Vercel → Environment Variables:** `BETTER_AUTH_SECRET` **diferente** em Preview e Production
       (`openssl rand -base64 32` para cada). Assim um cookie de produção não vale num preview.
-- [ ] **Vercel → Deployment Protection:** ligar _Vercel Authentication_ nos previews (só quem é do time
+- [x] **Vercel → Deployment Protection:** ligar _Vercel Authentication_ nos previews (só quem é do time
       abre um preview).
-- [ ] **Neon → previews:** preferir branches de preview só com schema (sem dados) ou com dados
-      anonimizados; no mínimo, apagar os `preview/*` antigos. A integração atual copia o `production`.
-- [ ] **Vercel → Production:** `BETTER_AUTH_URL` definido com o domínio final (sem ele, a baseURL cai na
+- [ ] **Neon → previews:** a integração Neon ↔ Vercel sempre copia o branch padrão (`production`) e
+      não tem opção de branch só com schema. Enquanto a base for pequena e só o time abrir PRs, o risco
+      fica contido pelo segredo separado e pelo Deployment Protection; garantir _Automatically delete
+      obsolete Neon branches_ ligado (Neon Console → Integrations → Vercel → Manage → Settings). Com
+      clientes reais, trocar o preview branching da integração por branches só com schema (`--schema-only`)
+      ou anonimizados, criados por PR.
+- [x] **Vercel → Production:** `BETTER_AUTH_URL` definido com o domínio final (sem ele, a baseURL cai na
       URL do deploy).
 - [ ] **GitHub → Settings → Branches:** proteger a `main` com os checks `checks`, `branch-name` e
       `pr-title` (já descrito em `docs/git-workflow.md`).
