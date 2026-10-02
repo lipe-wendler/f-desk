@@ -121,6 +121,17 @@ describe('POST /chat', () => {
     expect(prompt[0]).toMatchObject({ role: 'system' })
     expect(String(prompt[0]!.content)).toContain('Você é a Wen')
     expect(prompt.map((m) => m.role)).toEqual(['system', 'user', 'assistant', 'user'])
+    // A nota de contexto vai na mensagem atual, não nas instruções (que ficam em cache).
+    expect(JSON.stringify(prompt.at(-1)!.content)).toContain('a pessoa é visitante')
+  })
+
+  it('avisa o modelo quando a pessoa está logada', async () => {
+    const { model, calls } = streamingModel(['ok'])
+    const { app } = setup({ model, user: { id: 'u1' } })
+    await send(app, { message: 'o sistema de notas fiscais mostra erro 503 ao exportar' })
+    const prompt = (calls[0] as { prompt: { role: string; content: unknown }[] }).prompt
+    expect(JSON.stringify(prompt.at(-1)!.content)).toContain('já está logada')
+    expect(JSON.stringify(prompt[0]!.content)).not.toContain('já está logada como cliente')
   })
 
   it('sem LLM configurado, orienta a abrir chamado', async () => {

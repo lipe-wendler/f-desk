@@ -2,14 +2,20 @@ import { Hono } from 'hono'
 import { logger } from 'hono/logger'
 import {
   addClientReply,
+  addStaffReply,
   closeClientTicket,
   consumeChatQuota,
   createTicket,
   getClientTicket,
   getConversation,
+  getStaffMetrics,
+  getStaffTicket,
+  listAssignees,
   listClientTickets,
   listConversations,
+  listStaffTickets,
   saveChatExchange,
+  updateStaffTicket,
 } from '@f-desk/db'
 import { auth } from './auth'
 import { env } from './env'
@@ -18,6 +24,7 @@ import { adminUsers } from './routes/admin-users'
 import { createChatRoute } from './routes/chat'
 import { createConversationsRoute } from './routes/conversations'
 import { health } from './routes/health'
+import { createStaffRoute } from './routes/staff'
 import { createTicketsRoute } from './routes/tickets'
 import { createLanguageModel, resolveLlmConfig } from './services/llm/models'
 import { createQuota } from './services/rate-limit'
@@ -69,8 +76,17 @@ app.route(
   createConversationsRoute({ list: listConversations, get: getConversation }),
 )
 
-// Próxima tarefa:
-// app.route('/staff/tickets', staffTickets)  + requireRole('technician', 'admin')
+app.route(
+  '/staff',
+  createStaffRoute({
+    list: listStaffTickets,
+    metrics: getStaffMetrics,
+    get: getStaffTicket,
+    reply: addStaffReply,
+    update: updateStaffTicket,
+    assignees: listAssignees,
+  }),
+)
 
 app.notFound((c) => c.json({ error: 'Rota não encontrada.' }, 404))
 

@@ -1,6 +1,17 @@
 export { db, type Database } from './client'
 export { consumeChatQuota, saveChatExchange, type ChatExchange } from './queries/chat'
 export {
+  addStaffReply,
+  getStaffMetrics,
+  getStaffTicket,
+  listAssignees,
+  listStaffTickets,
+  updateStaffTicket,
+  type StaffQueueParams,
+  type StaffReplyResult,
+  type StaffUpdateResult,
+} from './queries/staff-tickets'
+export {
   addClientReply,
   closeClientTicket,
   createTicket,

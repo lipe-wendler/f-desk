@@ -63,7 +63,10 @@ export function createChatRoute(deps: ChatDeps) {
         let reply = ''
         try {
           if (source === 'llm' && deps.model) {
-            for await (const text of streamWenReply(deps.model, history, message, signal)) {
+            for await (const text of streamWenReply(deps.model, history, message, {
+              loggedIn: Boolean(user),
+              abortSignal: signal,
+            })) {
               reply += text
               send({ type: 'delta', text })
             }
