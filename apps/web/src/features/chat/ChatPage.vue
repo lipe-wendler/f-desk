@@ -7,8 +7,9 @@ import {
   TICKET_STATUS_LABEL,
   type FaqCategory,
   type FaqEntry,
+  type TicketProposal,
 } from '@f-desk/shared'
-import { FwButton, FwIcon, type IconName } from '@f-desk/ui'
+import { FwIcon, type IconName } from '@f-desk/ui'
 import { computed, nextTick, ref, useTemplateRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useToast } from '../../composables/useToast'
@@ -20,12 +21,15 @@ import ChatHeader from './ChatHeader.vue'
 import ChatWelcome from './ChatWelcome.vue'
 import ChatBubble from './conversation/ChatBubble.vue'
 import OptionList from './conversation/OptionList.vue'
+import TicketCreatedCard from './conversation/TicketCreatedCard.vue'
+import TicketProposalCard from './conversation/TicketProposalCard.vue'
 import './chat.css'
 
 /**
  * Atendimento: qualquer visitante conversa com o Wen sem conta. A página ocupa a altura da tela e
  * só a conversa rola. Dúvida e problema começam pelo atendimento guiado (respostas prontas, sem
  * LLM); o texto livre vai para o LLM. Do cliente, `/atendimento/:conversa` abre uma conversa salva.
+ * Chamado só nasce aqui: quando o Wen não resolve, ele prepara um e o cliente confirma no cartão.
  */
 const chat = useChatStore()
 const session = useSessionStore()
@@ -55,6 +59,10 @@ const title = computed(() => {
   )
 })
 const ticket = computed(() => chat.tickets.at(-1))
+/** Chamado preparado à espera do cliente: fica fixo acima do campo de mensagem. */
+const pendingProposal = computed(() =>
+  chat.messages.findLast((m) => m.proposal?.state === 'pending'),
+)
 
 const SUGGESTION_ICONS: Record<string, IconName> = {
   'sem-acesso-conta': 'key',
@@ -113,6 +121,16 @@ watch(
   },
 )
 
+// O box do chamado ocupa espaço embaixo: quem estava no fim continua vendo a última fala.
+watch(
+  () => pendingProposal.value?.id,
+  async () => {
+    if (!atBottom.value) return
+    await nextTick()
+    scrollToEnd()
+  },
+)
+
 // Conversa trocada (sidebar, nova conversa): começa do fim.
 watch(
   () => chat.conversationId,
@@ -124,7 +142,11 @@ watch(
 
 function announceLast() {
   const last = chat.messages.at(-1)
-  if (last?.role === 'assistant' && last.content) announcement.value = `Wen: ${last.content}`
+  if (last?.role !== 'assistant' || !last.content) return
+  announcement.value =
+    last.proposal?.state === 'pending'
+      ? `Wen: ${last.content} Chamado preparado: confira e confirme acima do campo de mensagem.`
+      : `Wen: ${last.content}`
 }
 
 /** Depois de uma troca gravada: a lista da sidebar sobe a conversa e a URL passa a apontar para ela. */
@@ -197,6 +219,44 @@ async function feedback(entryId: string, resolved: boolean) {
   })
 }
 
+/** Chamado aberto pelo cartão: avisa o leitor de tela, sobe a conversa na lista e acerta a URL. */
+async function proposalCreated(code: string) {
+  announcement.value = `Chamado ${code} aberto.`
+  if (!chat.conversationId) return
+  conversations.touch({
+    id: chat.conversationId,
+    firstQuestion: chat.messages.find((m) => m.role === 'user' && !m.local)?.content ?? '',
+    lastMessage: chat.messages.at(-1)?.content ?? '',
+    title: chat.meta?.title,
+    kind: chat.meta?.kind,
+    ticketCode: code,
+    added: 0,
+  })
+  if (routeId.value !== chat.conversationId)
+    await router.replace({ name: 'chat', params: { conversa: chat.conversationId } })
+}
+
+function proposalDismissed() {
+  announcement.value = 'Proposta de chamado descartada.'
+}
+
+/**
+ * Confirmação do box. Fica aqui, e não no cartão, porque o box some assim que o chamado é aberto e
+ * o que vem depois (foco, aviso, lista, URL) precisa rodar mesmo assim.
+ */
+async function confirmProposal(entryId: string, input: TicketProposal) {
+  const result = await chat.confirmProposal(entryId, input)
+  if (result.ok) await afterProposal(() => proposalCreated(result.code))
+  return result
+}
+
+/** O box sai de baixo e o registro fica na conversa: o foco volta ao campo, e a conversa desce. */
+async function afterProposal(handler: () => unknown) {
+  composer.value?.focus()
+  atBottom.value = true
+  await handler()
+}
+
 async function newConversation() {
   chat.reset()
   await router.push({ name: 'chat' })
@@ -265,6 +325,16 @@ async function newConversation() {
                     <FwIcon name="close" size="sm" />{{ GUIDED_FEEDBACK.unresolved.label }}
                   </button>
                 </div>
+                <TicketCreatedCard
+                  v-if="m.ticket"
+                  :code="m.ticket.code"
+                  :subject="m.ticket.subject"
+                />
+                <TicketProposalCard
+                  v-if="m.proposal?.state === 'dismissed'"
+                  :entry-id="m.id"
+                  :proposal="m.proposal"
+                />
               </ChatBubble>
             </li>
           </ol>
@@ -303,6 +373,14 @@ async function newConversation() {
             </button>
           </li>
         </ul>
+        <TicketProposalCard
+          v-if="pendingProposal?.proposal && !chat.sending"
+          :key="pendingProposal.id"
+          :entry-id="pendingProposal.id"
+          :proposal="pendingProposal.proposal"
+          :open="(input: TicketProposal) => confirmProposal(pendingProposal!.id, input)"
+          @dismissed="afterProposal(proposalDismissed)"
+        />
         <ChatComposer
           ref="composer"
           v-model="draft"
@@ -310,20 +388,7 @@ async function newConversation() {
           :sending="chat.sending"
           :error="chat.notice || undefined"
           @submit="send()"
-        >
-          <template #actions>
-            <!-- Até o Wen propor o chamado sozinho (tarefa 13). -->
-            <FwButton
-              v-if="hasMessages && !session.isStaff"
-              :to="{ name: 'ticket-new' }"
-              variant="ghost"
-              size="sm"
-              icon-left="plus"
-            >
-              Abrir chamado
-            </FwButton>
-          </template>
-        </ChatComposer>
+        />
       </div>
     </div>
   </div>

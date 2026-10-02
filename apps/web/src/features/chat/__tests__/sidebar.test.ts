@@ -89,7 +89,6 @@ async function mountShell(path: string, user: SessionUser | null) {
       { path: '/entrar', name: 'sign-in', component: stub },
       { path: '/criar-conta', name: 'sign-up', component: stub },
       { path: '/chamados', component: stub },
-      { path: '/chamados/novo', name: 'ticket-new', component: stub },
       { path: '/tecnico', component: stub },
       { path: '/', component: stub },
     ],

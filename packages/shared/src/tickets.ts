@@ -106,6 +106,25 @@ export const createTicketSchema = z.object({
 })
 export type CreateTicketInput = z.infer<typeof createTicketSchema>
 
+/** Assunto e descrição que o Wen propõe para o chamado (os mesmos limites do formulário). */
+export const ticketProposalSchema = createTicketSchema.pick({ subject: true, description: true })
+export type TicketProposal = z.infer<typeof ticketProposalSchema>
+
+/**
+ * Proposta de chamado montada sem LLM (sem modelo configurado): o assunto é a primeira fala do
+ * cliente e a descrição junta tudo o que ele contou.
+ */
+export function proposalFromMessages(userMessages: string[]): TicketProposal {
+  const said = userMessages.map((m) => m.replace(/\s+/g, ' ').trim()).filter(Boolean)
+  const first = said[0] ?? 'Atendimento pelo chat'
+  const subject = first.length <= 80 ? first : `${first.slice(0, 79).trimEnd()}…`
+  const description = `Relato do cliente no chat:\n${said.map((m) => `- ${m}`).join('\n')}`.slice(
+    0,
+    5000,
+  )
+  return { subject: subject.length >= 3 ? subject : 'Atendimento pelo chat', description }
+}
+
 /** Código do chamado na URL e na API (`TKT-0001`). */
 export const TICKET_CODE_PATTERN = /^TKT-\d{4,}$/
 
@@ -190,6 +209,10 @@ export interface ConversationDetail {
   title: string | null
   kind: RequestKind | null
   status: ConversationStatus
-  messages: (TranscriptMessage & { createdAt: string })[]
+  /** `ticket`: a fala que registra um chamado aberto pela conversa (o chat mostra o cartão nela). */
+  messages: (TranscriptMessage & {
+    createdAt: string
+    ticket: { code: string; subject: string } | null
+  })[]
   tickets: { code: string; status: TicketStatus }[]
 }

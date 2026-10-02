@@ -54,7 +54,7 @@ describe('acesso', () => {
 
 describe('POST /tickets', () => {
   it('abre o chamado do cliente logado com a conversa', async () => {
-    store.create.mockResolvedValue({ id: 'x', code: 'TKT-0007' })
+    store.create.mockResolvedValue({ id: 'x', code: 'TKT-0007', conversationId: 'conv-1' })
     const conversationId = '11111111-1111-4111-8111-111111111111'
     const res = await appAs(client).request(
       '/tickets',
@@ -67,7 +67,7 @@ describe('POST /tickets', () => {
       }),
     )
     expect(res.status).toBe(201)
-    expect(await res.json()).toEqual({ code: 'TKT-0007' })
+    expect(await res.json()).toEqual({ code: 'TKT-0007', conversationId: 'conv-1' })
     expect(store.create).toHaveBeenCalledWith({
       clientId: 'c1',
       subject: 'Impressora parada',

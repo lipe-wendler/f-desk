@@ -1,12 +1,9 @@
-import type { ConversationSummary, TicketDetail, TicketSummary } from '@f-desk/shared'
+import type { TicketDetail, TicketSummary } from '@f-desk/shared'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
-import { useChatStore } from '../../../stores/chat'
 import { useSessionStore } from '../../../stores/session'
-import ConversationsPage from '../ConversationsPage.vue'
-import NewTicketPage from '../NewTicketPage.vue'
 import TicketPage from '../TicketPage.vue'
 import TicketsPage from '../TicketsPage.vue'
 
@@ -40,7 +37,6 @@ async function mountAt(component: object, path: string) {
     routes: [
       { path: '/', name: 'chat', component: stub },
       { path: '/chamados', name: 'tickets', component: stub },
-      { path: '/chamados/novo', name: 'ticket-new', component: stub },
       { path: '/chamados/:id', name: 'ticket', component: stub },
     ],
   })
@@ -77,74 +73,14 @@ describe('TicketsPage', () => {
     expect(wrapper.get('[data-testid="ticket-list"]').text()).toContain('TKT-0001')
     expect(wrapper.text()).toContain('Aberto')
 
+    // Chamado novo só pelo atendimento: o botão leva ao Wen.
+    const cta = wrapper.findAll('a').find((a) => a.text().includes('Falar com o Wen'))!
+    expect(cta.attributes('href')).toBe('/')
+    expect(wrapper.text()).not.toContain('Abrir chamado')
+
     await wrapper.findAll('[role="tab"]')[1]!.trigger('click')
     await flushPromises()
     expect(calls.at(-1)!.key).toContain('scope=done')
-  })
-})
-
-describe('NewTicketPage', () => {
-  it('anexa a conversa do visitante que entrou, abre o chamado e zera o chat', async () => {
-    localStorage.setItem(
-      'f-desk:chat',
-      JSON.stringify({
-        ownerId: null,
-        messages: [
-          { id: '1', role: 'user', content: 'a impressora não imprime' },
-          { id: '2', role: 'assistant', content: 'Confira o papel.', source: 'faq' },
-        ],
-      }),
-    )
-    const calls = mockApi({ 'POST /tickets': () => jsonResponse({ code: 'TKT-0042' }, 201) })
-    const { wrapper, router } = await mountAt(NewTicketPage, '/chamados/novo')
-    expect(wrapper.text()).toContain('Anexar a conversa com a Wen (2 mensagens)')
-
-    await wrapper.get('input').setValue('Impressora parada')
-    await wrapper.get('textarea').setValue('Não imprime desde ontem à tarde.')
-    await wrapper.get('form').trigger('submit')
-    await flushPromises()
-
-    expect(calls[0]!.body).toEqual({
-      subject: 'Impressora parada',
-      description: 'Não imprime desde ontem à tarde.',
-      transcript: [
-        { role: 'user', content: 'a impressora não imprime' },
-        { role: 'assistant', content: 'Confira o papel.' },
-      ],
-    })
-    expect(router.currentRoute.value.fullPath).toBe('/chamados/TKT-0042')
-    expect(useChatStore().messages).toEqual([])
-  })
-
-  it('usa a conversa gravada quando ela está completa no servidor', async () => {
-    const conversationId = '11111111-1111-4111-8111-111111111111'
-    localStorage.setItem(
-      'f-desk:chat',
-      JSON.stringify({
-        ownerId: 'c1',
-        conversationId,
-        messages: [
-          { id: '1', role: 'user', content: 'oi' },
-          { id: '2', role: 'assistant', content: 'Olá.' },
-        ],
-      }),
-    )
-    const calls = mockApi({ 'POST /tickets': () => jsonResponse({ code: 'TKT-0043' }, 201) })
-    const { wrapper } = await mountAt(NewTicketPage, '/chamados/novo')
-    await wrapper.get('input').setValue('Assunto ok')
-    await wrapper.get('textarea').setValue('Descrição com detalhes.')
-    await wrapper.get('form').trigger('submit')
-    await flushPromises()
-    expect(calls[0]!.body).toMatchObject({ conversationId, transcript: [] })
-  })
-
-  it('valida os campos sem chamar a API', async () => {
-    const calls = mockApi({})
-    const { wrapper } = await mountAt(NewTicketPage, '/chamados/novo')
-    await wrapper.get('form').trigger('submit')
-    await flushPromises()
-    expect(wrapper.text()).toContain('Descreva o assunto em poucas palavras.')
-    expect(calls).toHaveLength(0)
   })
 })
 
@@ -205,51 +141,5 @@ describe('TicketPage', () => {
     })
     const { wrapper } = await mountAt(TicketPage, '/chamados/TKT-0009')
     expect(wrapper.text()).toContain('Chamado não encontrado.')
-  })
-})
-
-describe('ConversationsPage', () => {
-  it('abre a conversa e oferece abrir chamado com ela', async () => {
-    const c: ConversationSummary = {
-      id: '22222222-2222-4222-8222-222222222222',
-      createdAt: '2026-10-02T12:00:00.000Z',
-      updatedAt: '2026-10-02T12:05:00.000Z',
-      title: null,
-      kind: null,
-      lastMessage: null,
-      firstQuestion: 'meu computador está lento',
-      messageCount: 2,
-      ticketCode: null,
-    }
-    mockApi({
-      'GET /conversations?': () => jsonResponse({ conversations: [c], total: 1 }),
-      [`GET /conversations/${c.id}`]: () =>
-        jsonResponse({
-          ...c,
-          messages: [
-            {
-              role: 'user',
-              content: 'meu computador está lento',
-              source: null,
-              createdAt: c.createdAt,
-            },
-            {
-              role: 'assistant',
-              content: 'Reinicie o computador.',
-              source: 'faq',
-              createdAt: c.createdAt,
-            },
-          ],
-          tickets: [],
-        }),
-    })
-    const { wrapper } = await mountAt(ConversationsPage, '/conversas')
-    await wrapper.get('[data-testid="conversation-list"] button').trigger('click')
-    await flushPromises()
-    expect(wrapper.text()).toContain('Reinicie o computador.')
-    const link = wrapper
-      .findAll('a')
-      .find((a) => a.text().includes('Abrir chamado com esta conversa'))!
-    expect(link.attributes('href')).toBe(`/chamados/novo?conversa=${c.id}`)
   })
 })

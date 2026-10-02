@@ -27,7 +27,7 @@ const emptyText = computed(
     ({
       active: 'Nenhum chamado em aberto.',
       done: 'Nenhum chamado encerrado ainda.',
-      all: 'Você ainda não abriu nenhum chamado.',
+      all: 'Você ainda não abriu nenhum chamado. Quando o Wen não resolver, ele prepara um para você.',
     })[scope.value],
 )
 
@@ -63,7 +63,8 @@ void load()
           Seus <span class="fw-hl">chamados</span>
         </h1>
       </div>
-      <FwButton :to="{ name: 'ticket-new' }" icon-left="plus">Abrir chamado</FwButton>
+      <!-- Chamado novo só pelo atendimento: o Wen tenta resolver antes e prepara o chamado. -->
+      <FwButton :to="{ name: 'chat' }" icon-left="message">Falar com o Wen</FwButton>
     </div>
 
     <FwTabs v-model="scope" :items="scopes" label="Filtrar chamados" variant="neutral" />
@@ -72,9 +73,6 @@ void load()
     <p v-else-if="loading && !tickets.length" class="m-0 text-ink-muted">Carregando…</p>
     <div v-else-if="!tickets.length" class="flex flex-col items-start gap-3">
       <p class="m-0 text-ink-muted">{{ emptyText }}</p>
-      <FwButton v-if="scope !== 'done'" :to="{ name: 'chat' }" variant="secondary" size="sm">
-        Falar com a Wen
-      </FwButton>
     </div>
     <ul
       v-else

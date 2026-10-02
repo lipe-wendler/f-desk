@@ -20,7 +20,11 @@ export const ticketsApi = {
   get: (code: string) => apiFetch<TicketDetail>(`/tickets/${encodeURIComponent(code)}`),
   create: (
     input: Partial<CreateTicketInput> & Pick<CreateTicketInput, 'subject' | 'description'>,
-  ) => apiFetch<{ code: string }>('/tickets', { method: 'POST', body: JSON.stringify(input) }),
+  ) =>
+    apiFetch<{ code: string; conversationId: string | null }>('/tickets', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
   reply: (code: string, content: string) =>
     apiFetch<{ status: TicketStatus }>(`/tickets/${encodeURIComponent(code)}/messages`, {
       method: 'POST',

@@ -37,7 +37,7 @@ export const GUIDED_FEEDBACK = {
   unresolved: {
     label: 'Não resolveu',
     reply:
-      'Entendi. Me conte com mais detalhes o que acontece: o que você já tentou e o que aparece na tela. Vou analisar o seu caso.',
+      'Entendi. Me conte com mais detalhes o que acontece: o que você já tentou e o que aparece na tela. Se eu não conseguir resolver, preparo um chamado para a equipe técnica.',
   },
 }
 

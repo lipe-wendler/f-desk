@@ -15,9 +15,10 @@ async function mountAs(role: Role) {
   useSessionStore().user = { id: '1', name: 'Ana Souza', email: 'ana@exemplo.com', role }
   const router = createRouter({
     history: createMemoryHistory(),
-    routes: ['/', '/entrar', '/chamados', '/conversas', '/tecnico', '/admin/usuarios'].map(
-      (path) => ({ path, component: stub }),
-    ),
+    routes: ['/', '/entrar', '/chamados', '/tecnico', '/admin/usuarios'].map((path) => ({
+      path,
+      component: stub,
+    })),
   })
   router.addRoute({ path: '/login', name: 'sign-in', component: stub })
   await router.push('/')
@@ -43,7 +44,7 @@ describe('UserMenu', () => {
   })
 
   it.each([
-    ['client', 'Cliente', ['Meus chamados', 'Conversas', 'Sair']],
+    ['client', 'Cliente', ['Meus chamados', 'Sair']],
     ['technician', 'Técnico', ['Dashboard', 'Sair']],
     ['admin', 'Admin', ['Dashboard', 'Usuários', 'Sair']],
   ] as const)('perfil %s mostra os atalhos certos', async (role, label, items) => {

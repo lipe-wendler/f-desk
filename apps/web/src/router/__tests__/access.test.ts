@@ -15,19 +15,18 @@ describe('acesso às rotas por perfil', () => {
     expect(check('/criar-conta')).toBe(true)
   })
 
-  it('visitante que tenta abrir chamado vai para o login e volta depois', () => {
-    expect(check('/chamados/novo')).toEqual({
+  it('visitante que tenta ver chamados vai para o login e volta depois', () => {
+    expect(check('/chamados/TKT-0001')).toEqual({
       name: 'sign-in',
-      query: { redirect: '/chamados/novo' },
+      query: { redirect: '/chamados/TKT-0001' },
     })
     expect(check('/chamados')).toEqual({ name: 'sign-in', query: { redirect: '/chamados' } })
     expect(check('/tecnico')).toEqual({ name: 'sign-in', query: { redirect: '/tecnico' } })
   })
 
-  it('cliente acessa chamados e conversas, mas não o dashboard nem a gestão de usuários', () => {
+  it('cliente acessa os chamados, mas não o dashboard nem a gestão de usuários', () => {
     expect(check('/chamados', 'client')).toBe(true)
-    expect(check('/chamados/novo', 'client')).toBe(true)
-    expect(check('/conversas', 'client')).toBe(true)
+    expect(check('/chamados/TKT-0001', 'client')).toBe(true)
     expect(check('/tecnico', 'client')).toEqual({ name: 'forbidden' })
     expect(check('/admin/usuarios', 'client')).toEqual({ name: 'forbidden' })
   })
@@ -49,6 +48,14 @@ describe('acesso às rotas por perfil', () => {
     expect(check('/', 'client')).toBe(true)
     expect(check('/', 'technician')).toBe(true)
     expect(check('/atendimento', 'client')).toBe(true)
+  })
+
+  it('abrir chamado e conversas antigas levam ao atendimento (o chamado nasce no chat)', async () => {
+    const nav = createRouter({ history: createMemoryHistory(), routes })
+    await nav.push('/chamados/novo')
+    expect(nav.currentRoute.value.name).toBe('chat')
+    await nav.push('/conversas')
+    expect(nav.currentRoute.value.name).toBe('chat')
   })
 
   it('usuário logado que abre entrar/criar conta vai para a página inicial do perfil', () => {

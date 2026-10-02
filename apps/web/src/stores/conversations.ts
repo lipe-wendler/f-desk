@@ -66,7 +66,12 @@ export const useConversationsStore = defineStore('conversations', () => {
     lastMessage: string
     title?: string
     kind?: RequestKind | null
+    /** Chamado aberto a partir da conversa (o selo da lista). */
+    ticketCode?: string
+    /** Mensagens novas gravadas (uma troca = 2; abrir chamado não grava mensagem). */
+    added?: number
   }) {
+    const added = change.added ?? 2
     if (query.value) return
     const now = new Date().toISOString()
     const current = items.value.find((c) => c.id === change.id)
@@ -74,8 +79,9 @@ export const useConversationsStore = defineStore('conversations', () => {
       ? {
           ...current,
           updatedAt: now,
-          messageCount: current.messageCount + 2,
+          messageCount: current.messageCount + added,
           lastMessage: change.lastMessage,
+          ticketCode: change.ticketCode ?? current.ticketCode,
           title: current.title ?? change.title ?? null,
           kind: current.kind ?? change.kind ?? null,
         }
@@ -87,8 +93,8 @@ export const useConversationsStore = defineStore('conversations', () => {
           kind: change.kind ?? null,
           lastMessage: change.lastMessage,
           firstQuestion: change.firstQuestion,
-          messageCount: 2,
-          ticketCode: null,
+          messageCount: added,
+          ticketCode: change.ticketCode ?? null,
         }
     if (!current) total.value += 1
     items.value = [updated, ...items.value.filter((c) => c.id !== change.id)]
