@@ -5,9 +5,6 @@
     gap: var(--space-3);
     padding: 0 var(--space-4);
   }
-  .fw-header .fw-wordmark {
-    font-size: 20px;
-  }
   /* No celular os atalhos ficam no menu do usuário; a marca leva à página inicial. */
   .fw-nav {
     display: none;

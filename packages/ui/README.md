@@ -31,7 +31,7 @@ import { FwButton, FwInput } from '@f-desk/ui'
   Espaçamento na grade de 4px (`p-6` = 24px = `space-5`). Nunca escreva hex em componente.
 - **Componentes Vue** (`Fw*`): `FwButton`, `FwIconButton`, `FwIcon`, `FwSectionLabel`, `FwInput`, `FwSelect`,
   `FwTextarea`, `FwCheckbox`, `FwRadio`, `FwSwitch`, `FwTag`, `FwTabs`, `FwMedia`, `FwListRow`, `FwStepper`,
-  `FwMetricCard`, `FwFeatureCard`, `FwAppHeader`, `FwDialog` (modal sobre `<dialog>`, com `v-model:open`). Campos e seletores usam `v-model`.
+  `FwMetricCard`, `FwFeatureCard`, `FwAppHeader`, `FwLogo`, `FwDialog` (modal sobre `<dialog>`, com `v-model:open`). Campos e seletores usam `v-model`.
   `FwInput` com `type="password"` e `revealable` ganha o botão de mostrar/ocultar senha.
   `FwButton variant="danger"` (fundo `danger`, texto `on-danger`) só para ações destrutivas.
 - **Extensões do F.Desk**: `responsive.css` (ajustes de celular) e `extensions.css` (peças criadas aqui,
@@ -129,5 +129,20 @@ Três famílias, cada uma com um papel fixo — nunca troque os papéis:
 
 ## Logo
 
-- Ainda não há arquivo de logo: o wordmark é tipográfico — "F.Wendler" (ou "F.Desk" no produto) em Urbanist Bold,
-  tracking −0.02em, cor `ink`. Nunca amarelo, nunca contornado.
+- **Desenho:** um cubo isométrico em três tons e o nome "F.Desk".
+  - A face de cima é amarela (`brand-yellow`).
+  - As faces da esquerda são cinza claro (`brand-mist`) e as da direita cinza escuro (`brand-gray`).
+  - O ponto do "F.Desk" também é amarelo.
+  - Os originais ficam em `docs/marca/`.
+- **No código:** use sempre o componente `FwLogo`, nunca uma imagem. Ele é o SVG vetorizado dos originais, com os caminhos em `src/components/logo-paths.ts`.
+  - `variant="full"` (padrão) mostra a logo completa; `variant="symbol"` mostra só o cubo (avatar, favicon, espaços quadrados).
+  - As letras herdam a cor do texto (`ink`), então a mesma logo serve nos dois temas: clara no dark e escura no light. Não há arquivo "versão preta" separado.
+  - `mono` pinta tudo com a cor do texto, para fundos amarelos ou fotos.
+  - O tamanho vem da altura: 32px por padrão, 36px no topo (30px no celular), ou a prop `height`; a largura acompanha.
+- **Acessibilidade:** a logo tem `role="img"` com `aria-label` ("F.Desk" por padrão). Use `decorative` quando um texto ao lado já diz o nome.
+- **Arquivos públicos:** ficam em `apps/web/public/`.
+  - `favicon.svg` (só o cubo);
+  - `apple-touch-icon.png`, `icon-192.png`, `icon-512.png` e `icon-maskable-512.png`, todos com o cubo sobre `slate`;
+  - `og.png` (1200×630, a prévia ao compartilhar o link).
+- **Regras:** não distorça, não contorne, não troque as cores do cubo e não ponha a logo colorida sobre o amarelo (use `mono`).
+- **Wen (assistente):** o avatar fica em `apps/web/public/brand/wen-{96,192,512}.webp`, com o original em `docs/marca/wen.webp`. Use 96 para avatares de até 48px, 192 para até 96px e 512 na landing page.

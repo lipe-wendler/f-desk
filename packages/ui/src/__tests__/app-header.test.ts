@@ -50,6 +50,13 @@ describe('FwAppHeader', () => {
     expect(current()).toEqual([])
   })
 
+  it('mostra a logo como link para a página inicial', async () => {
+    const { w } = await mountAt('/admin/usuarios')
+    const brand = w.find('a.fw-header-brand')
+    expect(brand.attributes('href')).toBe('/')
+    expect(brand.find('svg[role="img"]').attributes('aria-label')).toBe('F.Desk')
+  })
+
   it('renderiza links com href e navega pelo router', async () => {
     const { w, current } = await mountAt('/admin/usuarios')
     const link = w.findAll('nav a')[0]!

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { resolveComponent } from 'vue'
+import FwLogo from './FwLogo.vue'
 
 /** Link da barra. `match` estende o destaque às rotas abaixo dele (ex.: `/tecnico` cobre `/tecnico/chamados/TKT-0007`). */
 export interface FwAppHeaderLink {
@@ -9,7 +10,7 @@ export interface FwAppHeaderLink {
 }
 
 /**
- * Barra de navegação: wordmark, links e ações (slot `actions`).
+ * Barra de navegação: logo, links e ações (slot `actions`). `brand` é o nome lido pelos leitores de tela.
  * O link ativo recebe `aria-current="page"`: na rota exata ou, com `match`, em qualquer rota abaixo do prefixo.
  */
 withDefaults(
@@ -32,7 +33,9 @@ function isCurrent(item: FwAppHeaderLink, path: string, exact: boolean) {
 
 <template>
   <header class="fw-header">
-    <component :is="link" class="fw-wordmark" :to="homeTo">{{ brand }}</component>
+    <component :is="link" class="fw-header-brand" :to="homeTo">
+      <FwLogo :label="brand" />
+    </component>
     <nav class="fw-nav" aria-label="Principal">
       <component
         :is="link"

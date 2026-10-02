@@ -133,3 +133,47 @@
 .fw-btn-danger:hover:not(:disabled) {
   filter: brightness(1.08);
 }
+
+/* FwLogo: cubo nas cores da marca, letras na cor do texto. A altura define o tamanho. */
+.fw-logo {
+  display: block;
+  width: auto;
+  height: 32px;
+  flex: none;
+  color: var(--ink);
+}
+.fw-logo-top,
+.fw-logo-dot {
+  fill: var(--brand-yellow);
+}
+.fw-logo-side {
+  fill: var(--brand-mist);
+}
+.fw-logo-shade {
+  fill: var(--brand-gray);
+}
+.fw-logo-text,
+.fw-logo-mono path {
+  fill: currentColor;
+}
+
+/* Link da marca no topo: só a logo, com área de clique confortável e foco visível. */
+.fw-header-brand .fw-logo {
+  height: 36px;
+}
+.fw-header-brand {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+}
+.fw-header-brand:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 4px;
+}
+@media (max-width: 640px) {
+  .fw-header-brand .fw-logo {
+    height: 30px;
+  }
+}

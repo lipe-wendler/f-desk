@@ -7,6 +7,7 @@ import {
   FwIconButton,
   FwInput,
   FwListRow,
+  FwLogo,
   FwMedia,
   FwMetricCard,
   FwRadio,
@@ -213,7 +214,26 @@ const swatches = [
     </section>
 
     <section class="flex flex-col gap-4">
-      <FwSectionLabel :number="7">Ícones</FwSectionLabel>
+      <FwSectionLabel :number="7">Marca</FwSectionLabel>
+      <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div class="grid place-items-center rounded-md border border-line bg-surface p-6">
+          <FwLogo :height="48" />
+        </div>
+        <div class="grid place-items-center rounded-md border border-line bg-surface p-6">
+          <FwLogo variant="symbol" :height="48" />
+        </div>
+        <div class="grid place-items-center rounded-md bg-accent p-6 text-on-accent">
+          <FwLogo mono :height="48" />
+        </div>
+        <div class="flex items-center gap-3 rounded-md border border-line bg-surface p-6">
+          <img src="/brand/wen-96.webp" alt="" width="48" height="48" class="rounded-md" />
+          <span class="font-display text-lg font-bold">Wen</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="flex flex-col gap-4">
+      <FwSectionLabel :number="8">Ícones</FwSectionLabel>
       <div class="grid grid-cols-4 gap-3 sm:grid-cols-8 lg:grid-cols-11">
         <div
           v-for="name in ICON_NAMES"
