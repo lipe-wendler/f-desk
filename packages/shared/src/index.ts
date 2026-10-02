@@ -1,4 +1,6 @@
 export * from './admin'
 export * from './auth'
+export * from './chat'
+export * from './faq'
 export * from './roles'
 export * from './tickets'
