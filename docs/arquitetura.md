@@ -4,7 +4,7 @@
 Navegador ──► Vercel (mesmo domínio)
                ├─ /*      → apps/web (SPA Vue estático)
                └─ /api/*  → api/index.js → apps/api (Hono) ──► Neon Postgres (Drizzle, driver HTTP)
-                                                └──────────► Claude API (chatbot)
+                                                └──────────► LLM do chat (AI SDK: Gemini, Claude, OpenAI ou Grok)
 ```
 
 - **Mesmo domínio para site e API** (rewrite na Vercel, proxy do Vite em dev): o cookie de sessão do
@@ -26,9 +26,19 @@ Navegador ──► Vercel (mesmo domínio)
   - `/admin/usuarios`: a lista vem de `GET /api/admin/users` (busca sem diferenciar maiúsculas em nome
     e e-mail, filtro por perfil, paginação); as alterações usam `/api/auth/admin/*`. Sem provedor de
     e-mail ainda, a senha inicial é gerada na tela e o admin a repassa por um canal seguro.
-- **Chat sem login**: o visitante conversa com o chatbot sem conta; a conversa fica no navegador.
-  Para abrir chamado, ele entra ou cria conta e a transcrição vai junto com o chamado.
-  O chat público terá rate limit por IP guardado no Postgres (serverless não compartilha memória).
+- **Chat com a Wen** (`POST /api/chat`, público):
+  1. A mensagem passa primeiro pela base de FAQ (`packages/shared/src/faq.ts`, busca em
+     `apps/api/src/services/faq`). Se uma resposta pronta cobre a pergunta, ela volta na hora.
+  2. Fora do FAQ, o LLM responde (`services/llm`, AI SDK). O modelo vem de `LLM_MODEL`
+     (`<provedor>:<modelo>`, padrão `google:gemini-3.5-flash-lite`; provedores `google`, `anthropic`,
+     `openai` e `xai`). Sem a chave do provedor, o chat avisa para abrir um chamado.
+  3. A resposta chega em NDJSON (`ChatEvent` de `@f-desk/shared`), para o texto aparecer enquanto é gerado.
+  - **Visitante:** a conversa fica só no navegador (`localStorage`). **Logado:** a API também grava
+    pergunta e resposta em `conversation`/`conversation_message`, com a origem (`faq`/`llm`).
+  - Ao entrar na conta, a conversa do visitante segue no navegador e vai junto com o chamado
+    (abertura de chamado na tarefa 5).
+  - **Limite:** 20 mensagens a cada 10 minutos por conta ou por IP, contado no Postgres
+    (`chat_rate_limit`; serverless não compartilha memória). O IP é guardado como hash.
 
 ## Modelo de dados
 
@@ -37,6 +47,7 @@ Schema em `packages/db/src/schema`; status, prioridades e papéis das mensagens 
 
 - **Auth** (`auth.ts`, gerado pelo better-auth): `user` (com `role`, `banned`…), `session`, `account`,
   `verification`, `rate_limit`.
+- **Limite do chat** (`chat.ts`): `chat_rate_limit` (key, window_start, count), janela fixa por chave.
 - **Chamados e conversas** (`tickets.ts`):
 
 | Tabela                 | Campos principais                                                                                                                                                       |
@@ -72,7 +83,7 @@ Schema em `packages/db/src/schema`; status, prioridades e papéis das mensagens 
 1. ~~`feat/telas-de-login-e-cadastro`~~ — concluída
 2. ~~`feat/gestao-de-usuarios-admin`~~ — concluída
 3. ~~`feat/modelo-de-chamados-e-conversas`~~ — concluída
-4. `feat/chatbot-faq-e-llm`
+4. ~~`feat/chatbot-faq-e-llm`~~ — concluída
 5. `feat/abertura-de-chamado-e-historico`
 6. `feat/dashboard-do-tecnico`
 7. `feat/recuperacao-de-senha-e-verificacao-de-email` (precisa de um provedor de e-mail)
