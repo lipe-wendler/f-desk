@@ -3,6 +3,8 @@ import {
   CHAT_ERROR_REPLY,
   CHAT_FALLBACK_REPLY,
   CHAT_PROPOSAL_REPLY,
+  CHAT_TICKET_DETAILS_REPLY,
+  CHAT_TICKET_REQUEST_REPLY,
   FAQ,
   GUIDED_FEEDBACK,
   chatRequestSchema,
@@ -16,6 +18,7 @@ import {
 import type { LanguageModel } from 'ai'
 import { Hono } from 'hono'
 import type { AppEnv } from '../middleware/session'
+import { isTicketRequest } from '../services/faq/intent'
 import { matchFaq } from '../services/faq/match'
 import { describeConversation, type ConversationMeta } from '../services/llm/meta'
 import { streamWenReply } from '../services/llm/reply'
@@ -67,7 +70,13 @@ export function createChatRoute(deps: ChatDeps) {
 
         // Opção do atendimento guiado: a resposta pronta escolhida, sem depender da busca por palavras.
         const chosen = faqId ? FAQ.find((entry) => entry.id === faqId) : undefined
-        const faq = chosen ? { entry: chosen, score: 1 } : matchFaq(message, history)
+        // Pedido de chamado não vai para a resposta pronta "como abrir": o Wen prepara o chamado.
+        const ticketRequested = !chosen && isTicketRequest(message)
+        const faq = chosen
+          ? { entry: chosen, score: 1 }
+          : ticketRequested
+            ? null
+            : matchFaq(message, history)
         const source: ChatReplySource = faq ? 'faq' : deps.model ? 'llm' : 'fallback'
         const signal = c.req.raw.signal
         const encoder = new TextEncoder()
@@ -84,6 +93,7 @@ export function createChatRoute(deps: ChatDeps) {
               if (source === 'llm' && deps.model) {
                 for await (const part of streamWenReply(deps.model, history, message, {
                   loggedIn: Boolean(user),
+                  ticketRequested,
                   abortSignal: signal,
                 })) {
                   if (part.type === 'proposal') {
@@ -98,16 +108,22 @@ export function createChatRoute(deps: ChatDeps) {
                   reply = CHAT_PROPOSAL_REPLY
                   send({ type: 'delta', text: reply })
                 }
-              } else {
-                reply = faq?.entry.answer ?? CHAT_FALLBACK_REPLY
+              } else if (faq) {
+                reply = faq.entry.answer
                 send({ type: 'delta', text: reply })
-                // Sem LLM e sem resposta pronta: o chamado sai do que o cliente contou.
-                if (!faq)
-                  proposal = proposalFromMessages(
-                    [...history.filter((m) => m.role === 'user').map((m) => m.content), message]
-                      // "Resolveu" / "Não resolveu" do atendimento guiado não descrevem o problema.
-                      .filter((m) => !FEEDBACK_LABELS.has(m)),
-                  )
+              } else {
+                // Sem LLM e sem resposta pronta: o chamado sai do que o cliente contou. Ficam de fora
+                // o "Resolveu" / "Não resolveu" do atendimento guiado e os próprios pedidos de chamado.
+                const told = [...history.filter((m) => m.role === 'user').map((m) => m.content)]
+                  .concat(ticketRequested ? [] : [message])
+                  .filter((m) => !FEEDBACK_LABELS.has(m) && !isTicketRequest(m))
+                if (told.length) proposal = proposalFromMessages(told)
+                reply = !ticketRequested
+                  ? CHAT_FALLBACK_REPLY
+                  : proposal
+                    ? CHAT_TICKET_REQUEST_REPLY
+                    : CHAT_TICKET_DETAILS_REPLY
+                send({ type: 'delta', text: reply })
               }
             } catch (error) {
               if (!signal.aborted) console.error('[chat] falha ao gerar resposta', error)

@@ -42,7 +42,8 @@ export interface ChatEntry {
 }
 
 export interface ProposalState extends TicketProposal {
-  state: 'pending' | 'created' | 'dismissed'
+  /** `replaced`: outra proposta veio depois (ou o chamado já foi aberto); some da tela. */
+  state: 'pending' | 'created' | 'dismissed' | 'replaced'
   /** Código do chamado aberto a partir da proposta. */
   code?: string
 }
@@ -172,6 +173,8 @@ export const useChatStore = defineStore('chat', () => {
           reply.createdAt = now()
           reply.pending = false
         } else if (event.type === 'ticket-proposal') {
+          // Só uma proposta fica à espera: a mais nova substitui a anterior.
+          replacePending()
           reply.proposal = {
             subject: event.subject,
             description: event.description,
@@ -294,8 +297,7 @@ export const useChatStore = defineStore('chat', () => {
     const { code } = result.data
     entry.proposal = { ...input, state: 'created', code }
     // Uma conversa, um chamado: as outras propostas pendentes deixam de valer.
-    for (const m of messages.value)
-      if (m.proposal?.state === 'pending') m.proposal = { ...m.proposal, state: 'dismissed' }
+    replacePending()
     tickets.value = [...tickets.value, { code, status: 'open' }]
     // A conversa ligada ao chamado passa a ser a desta tela (a criada com a transcrição, se for o caso).
     if (result.data.conversationId) {
@@ -310,6 +312,11 @@ export const useChatStore = defineStore('chat', () => {
       createdAt: now(),
     })
     return { ok: true, code }
+  }
+
+  function replacePending() {
+    for (const m of messages.value)
+      if (m.proposal?.state === 'pending') m.proposal = { ...m.proposal, state: 'replaced' }
   }
 
   /** "Agora não": a proposta fica registrada como descartada; o cliente pode pedir de novo. */

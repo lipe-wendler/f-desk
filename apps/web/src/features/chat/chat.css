@@ -421,10 +421,13 @@ a.chat-conversation-status:hover {
   color: var(--success);
   font: 600 15px/22px var(--font-sans);
 }
-.chat-proposal [tabindex='-1']:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-  border-radius: var(--radius-sm);
+/* Pendente: fixo acima do campo de mensagem, com rolagem própria se a descrição for longa. */
+.chat-proposal-docked {
+  width: 100%;
+  max-height: min(420px, 50dvh);
+  margin-top: 0;
+  overflow-y: auto;
+  box-shadow: var(--shadow-pop);
 }
 
 /* Sugestões da tela inicial: quebram linha no desktop; no celular, uma linha com rolagem lateral. */

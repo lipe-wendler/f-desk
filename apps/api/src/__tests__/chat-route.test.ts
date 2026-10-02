@@ -3,6 +3,8 @@ import {
   CHAT_ERROR_REPLY,
   CHAT_FALLBACK_REPLY,
   CHAT_PROPOSAL_REPLY,
+  CHAT_TICKET_DETAILS_REPLY,
+  CHAT_TICKET_REQUEST_REPLY,
   FAQ,
   GUIDED_FEEDBACK,
   QUICK_SUGGESTIONS,
@@ -199,6 +201,48 @@ describe('POST /chat', () => {
         'Relato do cliente no chat:\n- Não consigo exportar as notas\n- o sistema de notas fiscais mostra erro 503',
     })
     expect(events.at(-1)).toEqual({ type: 'end' })
+  })
+
+  it('pedido de chamado vai ao LLM com a nota de pedido, não à resposta pronta', async () => {
+    const { model, calls } = streamingModel(['Me conte o que está acontecendo.'])
+    const { app } = setup({ model })
+    const { events } = await send(app, { message: 'Abra um chamado para mim' })
+    expect(events[0]).toEqual({ type: 'start', source: 'llm' })
+    const prompt = (calls[0] as { prompt: { role: string; content: unknown }[] }).prompt
+    expect(JSON.stringify(prompt.at(-1)!.content)).toContain('a pessoa pediu um chamado')
+    expect(String(prompt[0]!.content)).toContain('Nunca mande a pessoa entrar na conta')
+  })
+
+  it('"como abro um chamado?" continua com a resposta pronta, sem a nota de pedido', async () => {
+    const { model, calls } = streamingModel(['x'])
+    const { app } = setup({ model })
+    const { events } = await send(app, { message: 'Como abro um chamado?' })
+    expect(events[0]).toEqual({ type: 'start', source: 'faq', faqId: 'abrir-chamado' })
+    expect(calls).toHaveLength(0)
+  })
+
+  it('sem LLM, pedido de chamado usa o que o cliente já contou', async () => {
+    const { app } = setup({ model: null })
+    const { events } = await send(app, {
+      message: 'quero abrir um chamado',
+      history: [
+        { role: 'user', content: 'O relatório de vendas sai com valores errados' },
+        { role: 'assistant', content: CHAT_FALLBACK_REPLY },
+      ],
+    })
+    expect(text(events)).toBe(CHAT_TICKET_REQUEST_REPLY)
+    expect(events.at(-2)).toEqual({
+      type: 'ticket-proposal',
+      subject: 'O relatório de vendas sai com valores errados',
+      description: 'Relato do cliente no chat:\n- O relatório de vendas sai com valores errados',
+    })
+  })
+
+  it('sem LLM, pedido de chamado sem o problema contado pergunta antes de preparar', async () => {
+    const { app } = setup({ model: null })
+    const { events } = await send(app, { message: 'Abra um chamado' })
+    expect(text(events)).toBe(CHAT_TICKET_DETAILS_REPLY)
+    expect(events.some((e) => e.type === 'ticket-proposal')).toBe(false)
   })
 
   it('resposta pronta não traz proposta de chamado', async () => {

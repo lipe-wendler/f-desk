@@ -13,6 +13,10 @@ export function contextNote(loggedIn: boolean) {
     : 'Contexto do sistema: a pessoa é visitante, sem login.'
 }
 
+/** Nota extra quando a mensagem é um pedido de chamado: o modelo prepara em vez de explicar como abrir. */
+export const TICKET_REQUEST_NOTE =
+  'Contexto do sistema: a pessoa pediu um chamado ou alguém da equipe. Se ela já contou o problema, chame proporChamado agora; se ainda não contou, pergunte o que está acontecendo.'
+
 /** Nome da ferramenta que o modelo chama quando não consegue resolver (citado no prompt). */
 export const PROPOSE_TICKET_TOOL = 'proporChamado'
 
@@ -39,7 +43,7 @@ export async function* streamWenReply(
   model: LanguageModel,
   history: ChatMessage[],
   message: string,
-  options: { loggedIn: boolean; abortSignal?: AbortSignal },
+  options: { loggedIn: boolean; ticketRequested?: boolean; abortSignal?: AbortSignal },
 ): AsyncGenerator<WenReplyPart> {
   const messages: ModelMessage[] = [
     ...history.slice(-HISTORY_LIMIT).map((m) => ({ role: m.role, content: m.content })),
@@ -47,6 +51,7 @@ export async function* streamWenReply(
       role: 'user',
       content: [
         { type: 'text', text: contextNote(options.loggedIn) },
+        ...(options.ticketRequested ? [{ type: 'text' as const, text: TICKET_REQUEST_NOTE }] : []),
         { type: 'text', text: message },
       ],
     },

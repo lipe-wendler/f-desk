@@ -41,7 +41,7 @@ export const FAQ: FaqEntry[] = [
       'falar com uma pessoa',
     ],
     answer:
-      'Conte aqui na conversa o que está acontecendo: o que aconteceu, quando começou e o que você já tentou. Eu tento resolver primeiro; se não der, preparo um chamado com o que você contou, e você só confere e confirma. Para abrir é preciso estar logado (criar a conta leva menos de um minuto). A conversa vai junto com o chamado.',
+      'Por aqui mesmo. Conte o que está acontecendo: o que aconteceu, quando começou e o que você já tentou. Eu tento resolver primeiro; se não der, ou se você pedir, preparo o chamado com o que você contou, e você só confere e confirma. Se você não tiver entrado na conta, eu peço o login na hora de confirmar. A conversa vai junto com o chamado.',
   },
   {
     id: 'acompanhar-chamado',
@@ -65,7 +65,7 @@ export const FAQ: FaqEntry[] = [
     question: 'Preciso de uma conta para ser atendido?',
     patterns: ['criar conta', 'preciso de conta', 'cadastro', 'cadastrar', 'sem conta'],
     answer:
-      'Para tirar dúvidas comigo, não. Para abrir um chamado com um técnico, sim: crie a conta em "Criar conta" com nome, e-mail e senha. Assim você acompanha o atendimento e guarda o histórico das conversas.',
+      'Para tirar dúvidas comigo, não. Para abrir um chamado com um técnico, sim: quando eu preparar o chamado, peço para você entrar ou criar a conta, e a conversa continua de onde parou. Com a conta, você acompanha o atendimento e guarda o histórico das conversas.',
   },
   {
     id: 'senha-forte',
@@ -376,7 +376,7 @@ export const FAQ: FaqEntry[] = [
       'ransomware',
     ],
     answer:
-      '1. Desconecte o computador da internet.\n2. Não digite senhas nesse computador.\n3. Rode uma verificação completa com o antivírus (no Windows, a Segurança do Windows).\n4. Troque as senhas importantes usando outro aparelho.\nAbra um chamado logo em seguida, principalmente se arquivos sumiram ou foram bloqueados.',
+      '1. Desconecte o computador da internet.\n2. Não digite senhas nesse computador.\n3. Rode uma verificação completa com o antivírus (no Windows, a Segurança do Windows).\n4. Troque as senhas importantes usando outro aparelho.\nDepois me avise aqui que eu preparo um chamado na hora, principalmente se arquivos sumiram ou foram bloqueados.',
   },
 ]
 

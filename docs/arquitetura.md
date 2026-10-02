@@ -57,8 +57,15 @@ Navegador ──► Vercel (mesmo domínio)
       do `end`. Se o modelo só chamar a ferramenta, o Wen fala `CHAT_PROPOSAL_REPLY`.
     - Sem LLM e sem resposta pronta: a proposta sai de `proposalFromMessages` (a primeira fala do cliente
       vira o assunto; tudo o que ele contou, a descrição).
-    - **Nada é aberto sem o cliente:** o cartão sob a bolha mostra assunto e descrição, com "Abrir
-      chamado", "Ajustar" (edição no próprio cartão) e "Agora não". Confirmar chama `POST /api/tickets`,
+    - **Pedido direto** ("abra um chamado", "quero falar com um técnico", em `services/faq/intent.ts`)
+      não cai na resposta pronta "Como abro um chamado?". Com LLM, a mensagem vai com uma nota pedindo a
+      proposta (ou uma pergunta, se o problema ainda não foi contado). Sem LLM, a proposta sai do que o
+      cliente já contou; se ele não contou nada, o Wen pergunta antes. O prompt proíbe mandar a pessoa
+      entrar na conta ou ir a "Meus chamados" para abrir o chamado.
+    - **Nada é aberto sem o cliente:** a proposta pendente fica num box fixo acima do campo de mensagem,
+      com assunto e descrição, "Abrir chamado", "Ajustar" (edição no próprio box) e "Agora não". Só a
+      proposta mais nova fica à espera. Aberta ou descartada, ela vira um registro na conversa e o foco
+      volta ao campo. Confirmar chama `POST /api/tickets`,
       que confere o perfil. Visitante vê "Entre para abrirmos o seu chamado" e a conversa segue depois do
       login; a equipe vê que só clientes abrem chamados.
     - Depois de aberto, o cartão mostra o código com link, o cabeçalho passa a "Chamado TKT-xxxx" e o Wen

@@ -51,6 +51,14 @@ export type ChatEvent =
 export const CHAT_FALLBACK_REPLY =
   'Não encontrei uma resposta pronta para isso. Preparei um chamado para um técnico olhar o seu caso: confira os dados abaixo e confirme.'
 
+/** Pedido de chamado atendido sem LLM: o chamado sai do que o cliente já contou. */
+export const CHAT_TICKET_REQUEST_REPLY =
+  'Preparei um chamado para a equipe técnica com o que você contou: confira os dados e confirme.'
+
+/** Pedido de chamado antes de contar o problema (sem LLM): o Wen pergunta antes de preparar. */
+export const CHAT_TICKET_DETAILS_REPLY =
+  'Posso preparar o chamado. Antes, me conte o que está acontecendo: o que aparece na tela, desde quando e o que você já tentou.'
+
 /** Texto da resposta quando o LLM só propõe o chamado, sem escrever nada antes. */
 export const CHAT_PROPOSAL_REPLY =
   'Não consegui resolver por aqui. Preparei um chamado para a equipe técnica: confira os dados abaixo e confirme.'

@@ -1,5 +1,10 @@
 <script setup lang="ts">
-import { fieldErrors, TICKET_MESSAGE_MAX, ticketProposalSchema } from '@f-desk/shared'
+import {
+  fieldErrors,
+  TICKET_MESSAGE_MAX,
+  ticketProposalSchema,
+  type TicketProposal,
+} from '@f-desk/shared'
 import { FwButton, FwIcon, FwInput, FwTextarea } from '@f-desk/ui'
 import { computed, nextTick, reactive, ref, useId, useTemplateRef } from 'vue'
 import FormAlert from '../../../components/FormAlert.vue'
@@ -10,9 +15,17 @@ import { useSessionStore } from '../../../stores/session'
 /**
  * Chamado que o Wen preparou. Nada é aberto sem o cliente: ele confere, ajusta se quiser e
  * confirma. Visitante precisa entrar (a conversa segue depois do login); a equipe não abre chamado.
+ * Pendente, fica fixo acima do campo de mensagem; aberto ou descartado, vira um registro na conversa.
  */
-const props = defineProps<{ entryId: string; proposal: ProposalState }>()
-const emit = defineEmits<{ created: [code: string]; dismissed: [] }>()
+type ConfirmResult = Awaited<ReturnType<ReturnType<typeof useChatStore>['confirmProposal']>>
+
+const props = defineProps<{
+  entryId: string
+  proposal: ProposalState
+  /** Abre o chamado (a página cuida do que vem depois, já que o box some ao abrir). */
+  open?: (input: TicketProposal) => Promise<ConfirmResult>
+}>()
+const emit = defineEmits<{ dismissed: [] }>()
 
 const chat = useChatStore()
 const session = useSessionStore()
@@ -63,8 +76,9 @@ async function confirm() {
     errors.value = fieldErrors(parsed.error)
     return
   }
+  if (!props.open) return
   submitting.value = true
-  const result = await chat.confirmProposal(props.entryId, parsed.data)
+  const result = await props.open(parsed.data)
   submitting.value = false
   if (!result.ok) {
     if (result.fields) errors.value = result.fields
@@ -72,21 +86,23 @@ async function confirm() {
     return
   }
   editing.value = false
-  emit('created', result.code)
-  void focus('[data-result]')
 }
 
 function dismiss() {
   chat.dismissProposal(props.entryId)
   emit('dismissed')
-  void focus('[data-result]')
 }
 </script>
 
 <template>
-  <section ref="root" class="chat-proposal" :aria-labelledby="titleId">
+  <section
+    ref="root"
+    :class="['chat-proposal', proposal.state === 'pending' && 'chat-proposal-docked']"
+    :aria-labelledby="titleId"
+    data-testid="ticket-proposal"
+  >
     <template v-if="proposal.state === 'created'">
-      <p :id="titleId" class="chat-proposal-done" tabindex="-1" data-result>
+      <p :id="titleId" class="chat-proposal-done">
         <FwIcon name="check" size="sm" />Chamado {{ proposal.code }} aberto
       </p>
       <p class="m-0 text-sm font-semibold">{{ proposal.subject }}</p>
@@ -96,7 +112,7 @@ function dismiss() {
     </template>
 
     <template v-else-if="proposal.state === 'dismissed'">
-      <p :id="titleId" class="m-0 text-sm text-ink-muted" tabindex="-1" data-result>
+      <p :id="titleId" class="m-0 text-sm text-ink-muted">
         Proposta de chamado descartada. Se precisar, peça o chamado aqui na conversa.
       </p>
     </template>
@@ -176,10 +192,14 @@ function dismiss() {
             >
               Criar conta
             </FwButton>
+            <FwButton variant="ghost" size="sm" @click="dismiss">Agora não</FwButton>
           </div>
         </template>
 
-        <p v-else class="m-0 text-sm text-ink-muted">Só clientes abrem chamados.</p>
+        <div v-else class="flex flex-wrap items-center justify-between gap-2">
+          <p class="m-0 text-sm text-ink-muted">Só clientes abrem chamados.</p>
+          <FwButton variant="ghost" size="sm" @click="dismiss">Fechar</FwButton>
+        </div>
       </template>
     </template>
   </section>

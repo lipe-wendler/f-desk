@@ -7,6 +7,7 @@ import {
   TICKET_STATUS_LABEL,
   type FaqCategory,
   type FaqEntry,
+  type TicketProposal,
 } from '@f-desk/shared'
 import { FwIcon, type IconName } from '@f-desk/ui'
 import { computed, nextTick, ref, useTemplateRef, watch } from 'vue'
@@ -57,6 +58,10 @@ const title = computed(() => {
   )
 })
 const ticket = computed(() => chat.tickets.at(-1))
+/** Chamado preparado à espera do cliente: fica fixo acima do campo de mensagem. */
+const pendingProposal = computed(() =>
+  chat.messages.findLast((m) => m.proposal?.state === 'pending'),
+)
 
 const SUGGESTION_ICONS: Record<string, IconName> = {
   'sem-acesso-conta': 'key',
@@ -115,6 +120,16 @@ watch(
   },
 )
 
+// O box do chamado ocupa espaço embaixo: quem estava no fim continua vendo a última fala.
+watch(
+  () => pendingProposal.value?.id,
+  async () => {
+    if (!atBottom.value) return
+    await nextTick()
+    scrollToEnd()
+  },
+)
+
 // Conversa trocada (sidebar, nova conversa): começa do fim.
 watch(
   () => chat.conversationId,
@@ -126,7 +141,11 @@ watch(
 
 function announceLast() {
   const last = chat.messages.at(-1)
-  if (last?.role === 'assistant' && last.content) announcement.value = `Wen: ${last.content}`
+  if (last?.role !== 'assistant' || !last.content) return
+  announcement.value =
+    last.proposal?.state === 'pending'
+      ? `Wen: ${last.content} Chamado preparado: confira e confirme acima do campo de mensagem.`
+      : `Wen: ${last.content}`
 }
 
 /** Depois de uma troca gravada: a lista da sidebar sobe a conversa e a URL passa a apontar para ela. */
@@ -220,6 +239,23 @@ function proposalDismissed() {
   announcement.value = 'Proposta de chamado descartada.'
 }
 
+/**
+ * Confirmação do box. Fica aqui, e não no cartão, porque o box some assim que o chamado é aberto e
+ * o que vem depois (foco, aviso, lista, URL) precisa rodar mesmo assim.
+ */
+async function confirmProposal(entryId: string, input: TicketProposal) {
+  const result = await chat.confirmProposal(entryId, input)
+  if (result.ok) await afterProposal(() => proposalCreated(result.code))
+  return result
+}
+
+/** O box sai de baixo e o registro fica na conversa: o foco volta ao campo, e a conversa desce. */
+async function afterProposal(handler: () => unknown) {
+  composer.value?.focus()
+  atBottom.value = true
+  await handler()
+}
+
 async function newConversation() {
   chat.reset()
   await router.push({ name: 'chat' })
@@ -289,11 +325,9 @@ async function newConversation() {
                   </button>
                 </div>
                 <TicketProposalCard
-                  v-if="m.proposal"
+                  v-if="m.proposal?.state === 'created' || m.proposal?.state === 'dismissed'"
                   :entry-id="m.id"
                   :proposal="m.proposal"
-                  @created="proposalCreated"
-                  @dismissed="proposalDismissed"
                 />
               </ChatBubble>
             </li>
@@ -333,6 +367,14 @@ async function newConversation() {
             </button>
           </li>
         </ul>
+        <TicketProposalCard
+          v-if="pendingProposal?.proposal && !chat.sending"
+          :key="pendingProposal.id"
+          :entry-id="pendingProposal.id"
+          :proposal="pendingProposal.proposal"
+          :open="(input: TicketProposal) => confirmProposal(pendingProposal!.id, input)"
+          @dismissed="afterProposal(proposalDismissed)"
+        />
         <ChatComposer
           ref="composer"
           v-model="draft"

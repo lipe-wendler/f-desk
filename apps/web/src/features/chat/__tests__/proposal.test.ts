@@ -129,10 +129,19 @@ describe('chamado preparado pelo Wen', () => {
     const { wrapper, router } = await mountPage(client)
     await ask(wrapper)
 
-    const card = wrapper.get('.chat-proposal')
-    expect(card.text()).toContain('Chamado preparado pelo Wen')
-    expect(card.text()).toContain(PROPOSAL.subject)
-    expect(card.text()).toContain(PROPOSAL.description)
+    // Pendente, o box fica fixo acima do campo de mensagem, fora da lista que rola.
+    const dock = wrapper.get('.chat-proposal-docked')
+    expect(wrapper.get('[data-testid="chat-messages"]').find('.chat-proposal').exists()).toBe(false)
+    expect(
+      dock.element.compareDocumentPosition(wrapper.get('.chat-composer-box').element) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    expect(dock.text()).toContain('Chamado preparado pelo Wen')
+    expect(dock.text()).toContain(PROPOSAL.subject)
+    expect(dock.text()).toContain(PROPOSAL.description)
+    expect(wrapper.get('[aria-live="polite"]').text()).toContain(
+      'Chamado preparado: confira e confirme acima do campo de mensagem.',
+    )
     // Nada é aberto sem confirmação.
     expect(created).toHaveLength(0)
 
@@ -140,9 +149,12 @@ describe('chamado preparado pelo Wen', () => {
     await flushPromises()
 
     expect(created).toEqual([{ ...PROPOSAL, conversationId: CONVERSATION, transcript: [] }])
-    expect(card.text()).toContain('Chamado TKT-0042 aberto')
-    expect(card.get('a').attributes('href')).toBe('/chamados/TKT-0042')
-    expect(document.activeElement?.textContent).toContain('Chamado TKT-0042 aberto')
+    // O box sai de baixo e o registro fica na conversa.
+    expect(wrapper.find('.chat-proposal-docked').exists()).toBe(false)
+    const record = wrapper.get('[data-testid="chat-messages"] .chat-proposal')
+    expect(record.text()).toContain('Chamado TKT-0042 aberto')
+    expect(record.get('a').attributes('href')).toBe('/chamados/TKT-0042')
+    expect(document.activeElement).toBe(wrapper.get('textarea').element)
     expect(wrapper.get('[aria-live="polite"]').text()).toBe('Chamado TKT-0042 aberto.')
     expect(wrapper.text()).toContain('Chamado TKT-0042 · Aberto')
     expect(wrapper.text()).toContain(ticketCreatedReply('TKT-0042'))
@@ -154,6 +166,19 @@ describe('chamado preparado pelo Wen', () => {
       role: 'assistant',
       content: ticketCreatedReply('TKT-0042'),
     })
+  })
+
+  it('uma proposta nova substitui a anterior: só um box fica à espera', async () => {
+    mockApi()
+    const { wrapper } = await mountPage(client)
+    await ask(wrapper)
+    await ask(wrapper, 'esqueci de dizer: acontece desde ontem')
+    expect(wrapper.findAll('.chat-proposal')).toHaveLength(1)
+    expect(
+      useChatStore()
+        .messages.map((m) => m.proposal?.state)
+        .filter(Boolean),
+    ).toEqual(['replaced', 'pending'])
   })
 
   it('"Ajustar" edita o assunto e a descrição, validando antes de enviar', async () => {
@@ -202,7 +227,11 @@ describe('chamado preparado pelo Wen', () => {
     await ask(wrapper)
     await buttonByText(wrapper, 'Agora não')!.trigger('click')
     await flushPromises()
-    expect(wrapper.get('.chat-proposal').text()).toContain('Proposta de chamado descartada')
+    expect(wrapper.find('.chat-proposal-docked').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="chat-messages"] .chat-proposal').text()).toContain(
+      'Proposta de chamado descartada',
+    )
+    expect(document.activeElement).toBe(wrapper.get('textarea').element)
     expect(buttonByText(wrapper, 'Abrir chamado')).toBeUndefined()
     expect(created).toHaveLength(0)
   })
@@ -243,6 +272,9 @@ describe('chamado preparado pelo Wen', () => {
     await ask(wrapper)
     expect(wrapper.get('.chat-proposal').text()).toContain('Só clientes abrem chamados.')
     expect(buttonByText(wrapper, 'Abrir chamado')).toBeUndefined()
+    await buttonByText(wrapper, 'Fechar')!.trigger('click')
+    await flushPromises()
+    expect(wrapper.find('.chat-proposal-docked').exists()).toBe(false)
   })
 
   it('o cartão não tem violações detectáveis pelo axe', async () => {
