@@ -160,6 +160,9 @@ importers:
 
   packages/db:
     dependencies:
+      '@f-desk/shared':
+        specifier: workspace:*
+        version: link:../shared
       '@neondatabase/serverless':
         specifier: ^1.2.0
         version: 1.2.0

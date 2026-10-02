@@ -8,6 +8,7 @@ Drizzle ORM sobre o Neon Postgres (driver HTTP `@neondatabase/serverless`, indic
 | `pnpm db:migrate`                 | Aplica as migrations no banco de `DATABASE_URL` (via HTTP)  |
 | `pnpm --filter @f-desk/db studio` | Abre o Drizzle Studio                                       |
 
+- `src/schema/tickets.ts`: chamados e conversas do chatbot (modelo em `docs/arquitetura.md`).
 - `src/schema/auth.ts` vem do CLI do better-auth. Ao mudar plugins em `apps/api/src/auth.ts`, regere com
   `cd apps/api && npx auth generate --config src/auth.ts --output ../../packages/db/src/schema/auth.ts`
   e depois rode `pnpm db:generate`.
