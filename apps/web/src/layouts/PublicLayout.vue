@@ -12,13 +12,13 @@ const links = computed(() => {
   if (session.user?.role === 'client')
     return [
       { label: 'Atendimento', to: '/' },
-      { label: 'Meus chamados', to: '/chamados' },
+      { label: 'Meus chamados', to: '/chamados', match: '/chamados' },
       { label: 'Conversas', to: '/conversas' },
     ]
   if (session.isStaff)
     return [
       { label: 'Atendimento', to: '/' },
-      { label: 'Dashboard', to: '/tecnico' },
+      { label: 'Dashboard', to: '/tecnico', match: '/tecnico' },
     ]
   return [{ label: 'Atendimento', to: '/' }]
 })
