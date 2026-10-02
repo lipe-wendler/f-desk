@@ -84,6 +84,7 @@ async function submit() {
         label="Senha"
         type="password"
         autocomplete="current-password"
+        placeholder="••••••••"
         revealable
         :error="errors.password"
         required

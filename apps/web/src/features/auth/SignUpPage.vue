@@ -79,6 +79,7 @@ async function submit() {
         label="Nome"
         icon="user"
         autocomplete="name"
+        placeholder="Seu nome completo"
         :error="errors.name"
         required
       />
@@ -98,6 +99,7 @@ async function submit() {
         label="Senha"
         type="password"
         autocomplete="new-password"
+        placeholder="••••••••"
         revealable
         :hint="`Pelo menos ${PASSWORD_MIN} caracteres.`"
         :error="errors.password"
@@ -108,6 +110,7 @@ async function submit() {
         label="Confirmar senha"
         type="password"
         autocomplete="new-password"
+        placeholder="••••••••"
         revealable
         :error="errors.confirmPassword"
         required
