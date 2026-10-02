@@ -1,6 +1,7 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 import FwButton from '../components/FwButton.vue'
+import FwDialog from '../components/FwDialog.vue'
 import FwInput from '../components/FwInput.vue'
 import FwTabs from '../components/FwTabs.vue'
 
@@ -85,5 +86,25 @@ describe('FwInput revealable', () => {
     })
     expect(w.find('button.fw-reveal').exists()).toBe(false)
     expect(w.find('input').attributes('type')).toBe('email')
+  })
+})
+
+describe('FwDialog', () => {
+  it('abre com v-model:open, liga título e fecha pelo botão', async () => {
+    const w = mount(FwDialog, {
+      props: { title: 'Novo usuário', description: 'Crie uma conta', open: false },
+      slots: { default: '<p>conteúdo</p>' },
+      attachTo: document.body,
+    })
+    const dialog = w.find('dialog')
+    expect(dialog.attributes('open')).toBeUndefined()
+    await w.setProps({ open: true })
+    await new Promise((r) => setTimeout(r))
+    expect(dialog.element.open).toBe(true)
+    const titleId = dialog.attributes('aria-labelledby')!
+    expect(w.find(`#${titleId}`).text()).toBe('Novo usuário')
+    await w.find('button[aria-label="Fechar"]').trigger('click')
+    expect(w.emitted('update:open')?.at(-1)).toEqual([false])
+    w.unmount()
   })
 })

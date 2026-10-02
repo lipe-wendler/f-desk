@@ -10,7 +10,7 @@ import type { IconName } from './icons'
  */
 const props = withDefaults(
   defineProps<{
-    variant?: 'primary' | 'secondary' | 'outline' | 'ghost'
+    variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger'
     size?: 'sm' | 'md' | 'lg'
     arrow?: boolean
     icon?: IconName

@@ -31,8 +31,9 @@ import { FwButton, FwInput } from '@f-desk/ui'
   Espaçamento na grade de 4px (`p-6` = 24px = `space-5`). Nunca escreva hex em componente.
 - **Componentes Vue** (`Fw*`): `FwButton`, `FwIconButton`, `FwIcon`, `FwSectionLabel`, `FwInput`, `FwSelect`,
   `FwTextarea`, `FwCheckbox`, `FwRadio`, `FwSwitch`, `FwTag`, `FwTabs`, `FwMedia`, `FwListRow`, `FwStepper`,
-  `FwMetricCard`, `FwFeatureCard`, `FwAppHeader`. Campos e seletores usam `v-model`.
+  `FwMetricCard`, `FwFeatureCard`, `FwAppHeader`, `FwDialog` (modal sobre `<dialog>`, com `v-model:open`). Campos e seletores usam `v-model`.
   `FwInput` com `type="password"` e `revealable` ganha o botão de mostrar/ocultar senha.
+  `FwButton variant="danger"` (fundo `danger`, texto `on-danger`) só para ações destrutivas.
 - **Extensões do F.Desk**: `responsive.css` (ajustes de celular) e `extensions.css` (peças criadas aqui,
   como o botão de senha) ficam separados para o `components.css` continuar igual à fonte.
 - **Só CSS**: os módulos de landing do design system (`fw-hero`, `fw-module`, `fw-quote-*`, `fw-principle`,

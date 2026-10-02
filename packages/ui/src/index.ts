@@ -1,6 +1,7 @@
 export { default as FwAppHeader } from './components/FwAppHeader.vue'
 export { default as FwButton } from './components/FwButton.vue'
 export { default as FwCheckbox } from './components/FwCheckbox.vue'
+export { default as FwDialog } from './components/FwDialog.vue'
 export { default as FwFeatureCard } from './components/FwFeatureCard.vue'
 export { default as FwIcon } from './components/FwIcon.vue'
 export { default as FwIconButton } from './components/FwIconButton.vue'

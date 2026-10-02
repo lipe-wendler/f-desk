@@ -13,6 +13,7 @@ const PAIRS: [string, string[], number][] = [
   ['on-accent', ['accent', 'accent-hover'], TEXT],
   ['success', ['bg', 'surface'], TEXT],
   ['danger', ['bg', 'surface', 'field'], TEXT],
+  ['on-danger', ['danger'], TEXT],
   ['line-strong', ['bg', 'surface', 'surface-raised', 'field'], UI],
   ['focus', ['bg', 'surface', 'surface-raised'], UI],
 ]

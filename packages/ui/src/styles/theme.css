@@ -22,6 +22,7 @@
   --color-focus: var(--focus);
   --color-success: var(--success);
   --color-danger: var(--danger);
+  --color-on-danger: var(--on-danger);
   --color-transparent: transparent;
   --color-current: currentColor;
 
