@@ -122,7 +122,10 @@ Configurações fora do código. Marque aqui quando aplicar.
       do GitHub não passa por ele) e o veredito da `/revisao-de-seguranca` é um aviso. Para ativar:
       GitHub Pro ou repositório público.
 - [x] **GitHub → Settings → Code security:** Dependabot alerts ligado. Secret scanning (Secret
-      Protection) é pago em repositório privado: confirmar se ficou ativo de fato.
+      Protection) fica **desligado** (pago em repositório privado); a busca de segredos no diff é
+      feita pela `/revisao-de-seguranca` (checklist, seção 6).
+- [x] **Claude Code:** o Claude não faz merge nem escreve na `main` (hook `proteger-main.mjs` e
+      regras `deny` em `.claude/settings.json`). Não substitui o ruleset: vale só para o Claude.
 
 ## Como verificar
 

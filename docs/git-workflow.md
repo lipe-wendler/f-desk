@@ -18,12 +18,12 @@
 
 ## O que garante isso
 
-| Onde                                          | Checagem                                                                                   |
-| --------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| Hook `commit-msg` (Husky + commitlint)        | Mensagem em Conventional Commits com descrição em kebab-case                               |
-| Hook `pre-push`                               | Bloqueia push para a `main` (inclusive `HEAD:main`) e nomes de branch fora do padrão       |
-| Hook do Claude Code (`.claude/settings.json`) | Depois de abrir um PR, o Claude é lembrado de rodar a `/revisao-de-seguranca`              |
-| CI (`.github/workflows/ci.yml`)               | Nome da branch, título do PR, commits da branch, Prettier, lint, typecheck, testes e build |
+| Onde                                           | Checagem                                                                                                        |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Hook `commit-msg` (Husky + commitlint)         | Mensagem em Conventional Commits com descrição em kebab-case                                                    |
+| Hook `pre-push`                                | Bloqueia push para a `main` (inclusive `HEAD:main`) e nomes de branch fora do padrão                            |
+| Hooks do Claude Code (`.claude/settings.json`) | Lembram a `/revisao-de-seguranca` depois de abrir um PR e impedem o Claude de fazer merge ou escrever na `main` |
+| CI (`.github/workflows/ci.yml`)                | Nome da branch, título do PR, commits da branch, Prettier, lint, typecheck, testes e build                      |
 
 ## Configuração no GitHub (manual, uma vez)
 
@@ -51,5 +51,9 @@ Rodada padronizada com o Claude Code antes de cada merge, sem GitHub Actions:
   **Bloqueado**).
 - **Hook** `PostToolUse` em `.claude/settings.json`: quando o Claude abre um PR (MCP do GitHub ou
   `gh pr create`), injeta o lembrete de rodar a revisão naquele PR.
+- **O Claude não faz merge nem escreve na `main`**: o hook `PreToolUse`
+  (`.claude/hooks/proteger-main.mjs`) e as regras `deny` do `.claude/settings.json` recusam merge e
+  auto-merge de PR (MCP e `gh pr merge`), escrita na `main` pela API do GitHub, push para a `main` e
+  push com os hooks do Git desligados (`--no-verify`, `HUSKY=0`). O merge é sempre seu.
 - O checklist nasce do [diagnóstico de segurança](seguranca/diagnostico-2026-10.md). Achado novo
   que vale para todo PR entra nos dois.
