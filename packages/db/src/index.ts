@@ -21,6 +21,7 @@ export {
 } from './queries/staff-tickets'
 export {
   addClientReply,
+  cancelClientTicket,
   closeClientTicket,
   createTicket,
   getClientTicket,

@@ -4,6 +4,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { useSessionStore } from '../../../stores/session'
+import { useToast } from '../../../composables/useToast'
 import TicketPage from '../TicketPage.vue'
 import TicketsPage from '../TicketsPage.vue'
 
@@ -90,6 +91,9 @@ describe('TicketPage', () => {
     description: 'Não imprime.',
     resolvedAt: null,
     closedAt: null,
+    cancelledAt: null,
+    closeReason: null,
+    canCancel: false,
     assigneeName: 'Téo',
     messages: [
       {
@@ -133,6 +137,122 @@ describe('TicketPage', () => {
     const { wrapper } = await mountAt(TicketPage, '/chamados/TKT-0001')
     expect(wrapper.find('textarea').exists()).toBe(false)
     expect(wrapper.text()).toContain('Chamado encerrado')
+  })
+
+  const buttonByText = (wrapper: Awaited<ReturnType<typeof mountAt>>['wrapper'], text: string) =>
+    wrapper.findAll('button').find((b) => b.text() === text)
+
+  it('"Já resolvi" pede confirmação e fecha o chamado como resolvido pelo cliente', async () => {
+    let current = detail()
+    const calls = mockApi({
+      'GET /tickets/TKT-0001': () => jsonResponse(current),
+      'POST /tickets/TKT-0001/close': () => {
+        current = detail({
+          status: 'closed',
+          closeReason: 'client_resolved',
+          closedAt: '2026-10-03T10:00:00.000Z',
+        })
+        return jsonResponse({ status: 'closed' })
+      },
+    })
+    const { wrapper } = await mountAt(TicketPage, '/chamados/TKT-0001')
+    // "Encerrar chamado" deu lugar ao "Já resolvi".
+    expect(buttonByText(wrapper, 'Encerrar chamado')).toBeUndefined()
+    await buttonByText(wrapper, 'Já resolvi')!.trigger('click')
+    await flushPromises()
+    // Nada acontece antes de confirmar.
+    expect(calls.some((c) => c.key.startsWith('POST'))).toBe(false)
+    const dialog = wrapper.get('dialog')
+    expect(dialog.text()).toContain('fechado como resolvido por você')
+
+    await buttonByText(wrapper, 'Fechar como resolvido')!.trigger('click')
+    await flushPromises()
+    expect(calls.filter((c) => c.key === 'POST /tickets/TKT-0001/close')).toHaveLength(1)
+    expect(wrapper.get('[data-testid="status-hint"]').text()).toBe(
+      'Você fechou este chamado como resolvido.',
+    )
+    expect(wrapper.find('textarea').exists()).toBe(false)
+  })
+
+  it('"Cancelar chamado" só aparece enquanto ninguém da equipe respondeu', async () => {
+    mockApi({ 'GET /tickets/TKT-0001': () => jsonResponse(detail({ canCancel: false })) })
+    const answered = await mountAt(TicketPage, '/chamados/TKT-0001')
+    expect(buttonByText(answered.wrapper, 'Cancelar chamado')).toBeUndefined()
+    expect(buttonByText(answered.wrapper, 'Já resolvi')).toBeTruthy()
+    answered.wrapper.unmount()
+
+    let current = detail({ status: 'open', messages: [], canCancel: true })
+    const calls = mockApi({
+      'GET /tickets/TKT-0001': () => jsonResponse(current),
+      'POST /tickets/TKT-0001/cancel': () => {
+        current = detail({
+          status: 'cancelled',
+          messages: [],
+          cancelledAt: '2026-10-03T10:00:00.000Z',
+        })
+        return jsonResponse({ status: 'cancelled' })
+      },
+    })
+    const { wrapper } = await mountAt(TicketPage, '/chamados/TKT-0001')
+    await buttonByText(wrapper, 'Cancelar chamado')!.trigger('click')
+    await flushPromises()
+    expect(calls.some((c) => c.key.startsWith('POST'))).toBe(false)
+    expect(wrapper.get('dialog').text()).toContain('não pode ser reaberto')
+    // "Voltar" não cancela nada.
+    await buttonByText(wrapper, 'Voltar')!.trigger('click')
+    await flushPromises()
+    expect(calls.some((c) => c.key.startsWith('POST'))).toBe(false)
+
+    await buttonByText(wrapper, 'Cancelar chamado')!.trigger('click')
+    await flushPromises()
+    const confirm = wrapper
+      .get('dialog')
+      .findAll('button')
+      .find((b) => b.text() === 'Cancelar chamado')!
+    await confirm.trigger('click')
+    await flushPromises()
+    expect(calls.filter((c) => c.key === 'POST /tickets/TKT-0001/cancel')).toHaveLength(1)
+    expect(wrapper.text()).toContain('Cancelado')
+    expect(wrapper.get('[data-testid="status-hint"]').text()).toContain(
+      'Você cancelou este chamado',
+    )
+    expect(wrapper.find('textarea').exists()).toBe(false)
+  })
+
+  it('se a equipe respondeu antes da confirmação, mostra o erro e recarrega sem o "Cancelar"', async () => {
+    let current = detail({ status: 'open', messages: [], canCancel: true })
+    mockApi({
+      'GET /tickets/TKT-0001': () => jsonResponse(current),
+      'POST /tickets/TKT-0001/cancel': () => {
+        current = detail({ status: 'in_progress', canCancel: false })
+        return jsonResponse(
+          {
+            error: 'Este chamado não pode mais ser cancelado: a equipe já começou o atendimento.',
+            code: 'NOT_CANCELLABLE',
+          },
+          409,
+        )
+      },
+    })
+    const { wrapper } = await mountAt(TicketPage, '/chamados/TKT-0001')
+    await buttonByText(wrapper, 'Cancelar chamado')!.trigger('click')
+    await flushPromises()
+    await wrapper
+      .get('dialog')
+      .findAll('button')
+      .find((b) => b.text() === 'Cancelar chamado')!
+      .trigger('click')
+    await flushPromises()
+    expect(useToast().toasts.value.at(-1)).toMatchObject({
+      message: 'Este chamado não pode mais ser cancelado: a equipe já começou o atendimento.',
+      tone: 'danger',
+    })
+    const formButtons = wrapper
+      .get('form')
+      .findAll('button')
+      .map((b) => b.text())
+    expect(formButtons).not.toContain('Cancelar chamado')
+    expect(formButtons).toContain('Já resolvi')
   })
 
   it('chamado de outra pessoa aparece como não encontrado', async () => {

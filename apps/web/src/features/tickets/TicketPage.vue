@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {
+  isTicketTerminal,
   TICKET_MESSAGE_MAX,
   TICKET_PRIORITY_LABEL,
   ticketMessageSchema,
@@ -15,7 +16,11 @@ import { ticketsApi } from './tickets-api'
 import TicketStatusTag from './TicketStatusTag.vue'
 import TranscriptView from './TranscriptView.vue'
 
-/** Chamado do cliente: andamento, conversa com a equipe, resposta e encerramento. */
+/**
+ * Chamado do cliente: andamento, conversa com a equipe e resposta. "Já resolvi" fecha o chamado;
+ * "Cancelar chamado" só aparece enquanto ninguém da equipe respondeu (`canCancel`). As duas ações
+ * pedem confirmação, e a API repete as regras.
+ */
 const route = useRoute()
 const { show } = useToast()
 
@@ -24,11 +29,38 @@ const loadError = ref('')
 const reply = ref('')
 const replyError = ref('')
 const sending = ref(false)
-const confirmClose = ref(false)
-const closing = ref(false)
+/** Ação mostrada no diálogo de confirmação (fica a última, para o texto não sumir ao fechar). */
+const pending = ref<'resolve' | 'cancel'>('resolve')
+const dialogOpen = ref(false)
+const acting = ref(false)
 
 const code = computed(() => String(route.params.id))
-const isClosed = computed(() => ticket.value?.status === 'closed')
+const isClosed = computed(() => (ticket.value ? isTicketTerminal(ticket.value.status) : false))
+
+const ACTIONS = {
+  resolve: {
+    title: 'Já resolvi',
+    description:
+      'O chamado vai ser fechado como resolvido por você e não recebe novas respostas. Se o problema voltar, abra um novo chamado.',
+    confirm: 'Fechar como resolvido',
+    done: (c: string) => `Chamado ${c} fechado como resolvido.`,
+    run: ticketsApi.close,
+  },
+  cancel: {
+    title: 'Cancelar chamado',
+    description:
+      'O chamado sai da fila da equipe e fica no seu histórico como cancelado. Ele não pode ser reaberto.',
+    confirm: 'Cancelar chamado',
+    done: (c: string) => `Chamado ${c} cancelado.`,
+    run: ticketsApi.cancel,
+  },
+} as const
+const action = computed(() => ACTIONS[pending.value])
+
+function ask(kind: 'resolve' | 'cancel') {
+  pending.value = kind
+  dialogOpen.value = true
+}
 
 const STATUS_HINT: Record<TicketDetail['status'], string> = {
   open: 'Recebido. Um técnico vai assumir o seu chamado.',
@@ -36,7 +68,10 @@ const STATUS_HINT: Record<TicketDetail['status'], string> = {
   waiting_client: 'O técnico precisa de uma resposta sua para continuar.',
   resolved: 'O técnico marcou como resolvido. Se o problema voltou, responda abaixo para reabrir.',
   closed: 'Chamado encerrado. Se precisar de ajuda de novo, abra um novo chamado.',
+  cancelled: 'Você cancelou este chamado. Se precisar de ajuda de novo, abra um novo chamado.',
 }
+/** Fechado pelo próprio cliente no "Já resolvi". */
+const RESOLVED_BY_CLIENT_HINT = 'Você fechou este chamado como resolvido.'
 
 async function load() {
   const result = await ticketsApi.get(code.value)
@@ -67,16 +102,15 @@ async function send() {
   await load()
 }
 
-async function close() {
-  closing.value = true
-  const result = await ticketsApi.close(code.value)
-  closing.value = false
-  confirmClose.value = false
-  if (result.error !== null) {
-    show(result.error, 'danger')
-    return
-  }
-  show(`Chamado ${code.value} encerrado.`)
+async function runAction() {
+  const { run, done } = action.value
+  acting.value = true
+  const result = await run(code.value)
+  acting.value = false
+  dialogOpen.value = false
+  if (result.error !== null) show(result.error, 'danger')
+  else show(done(code.value))
+  // Recarrega mesmo no erro: a equipe pode ter respondido e o "Cancelar" deixa de valer.
   await load()
 }
 
@@ -102,7 +136,13 @@ watch(code, load, { immediate: true })
           <span>Aberto em {{ formatDateTime(ticket.createdAt) }}</span>
           <span v-if="ticket.assigneeName">Técnico: {{ ticket.assigneeName }}</span>
         </div>
-        <p class="m-0 text-sm" data-testid="status-hint">{{ STATUS_HINT[ticket.status] }}</p>
+        <p class="m-0 text-sm" data-testid="status-hint">
+          {{
+            ticket.status === 'closed' && ticket.closeReason === 'client_resolved'
+              ? RESOLVED_BY_CLIENT_HINT
+              : STATUS_HINT[ticket.status]
+          }}
+        </p>
       </div>
 
       <ol class="m-0 flex list-none flex-col gap-4 p-0" data-testid="thread">
@@ -147,7 +187,12 @@ watch(code, load, { immediate: true })
           rows="4"
         />
         <div class="flex flex-wrap justify-end gap-2">
-          <FwButton variant="ghost" @click="confirmClose = true">Encerrar chamado</FwButton>
+          <FwButton v-if="ticket.canCancel" variant="ghost" @click="ask('cancel')">
+            Cancelar chamado
+          </FwButton>
+          <FwButton variant="secondary" icon-left="check" @click="ask('resolve')">
+            Já resolvi
+          </FwButton>
           <FwButton type="submit" arrow :disabled="sending || !reply.trim()">
             {{ sending ? 'Enviando…' : 'Enviar' }}
           </FwButton>
@@ -165,14 +210,20 @@ watch(code, load, { immediate: true })
     </aside>
 
     <FwDialog
-      v-model:open="confirmClose"
+      v-model:open="dialogOpen"
       size="sm"
-      title="Encerrar chamado"
-      description="Encerre quando o problema estiver resolvido ou se não precisar mais de ajuda. Um chamado encerrado não recebe novas respostas."
+      :title="action.title"
+      :description="action.description"
     >
       <template #footer>
-        <FwButton variant="ghost" @click="confirmClose = false">Cancelar</FwButton>
-        <FwButton :disabled="closing" @click="close">Encerrar</FwButton>
+        <FwButton variant="ghost" :disabled="acting" @click="dialogOpen = false">Voltar</FwButton>
+        <FwButton
+          :variant="pending === 'cancel' ? 'danger' : 'primary'"
+          :disabled="acting"
+          @click="runAction"
+        >
+          {{ action.confirm }}
+        </FwButton>
       </template>
     </FwDialog>
   </div>

@@ -31,8 +31,14 @@ export const ticketsApi = {
       method: 'POST',
       body: JSON.stringify({ content }),
     }),
+  /** "Já resolvi": fecha o chamado. */
   close: (code: string) =>
     apiFetch<{ status: 'closed' }>(`/tickets/${encodeURIComponent(code)}/close`, {
+      method: 'POST',
+    }),
+  /** Só enquanto ninguém da equipe respondeu (`canCancel` no detalhe). */
+  cancel: (code: string) =>
+    apiFetch<{ status: 'cancelled' }>(`/tickets/${encodeURIComponent(code)}/cancel`, {
       method: 'POST',
     }),
 }

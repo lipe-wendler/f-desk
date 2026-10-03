@@ -68,9 +68,9 @@ export function createStaffRoute(store: StaffStore, limits: { write?: ConsumeQuo
       const { content, internal } = parsed.data
       const result = await store.reply(c.get('user')!.id, code, content, internal)
       if (!result.ok) {
-        return result.reason === 'closed'
-          ? c.json({ error: STAFF_UPDATE_ERRORS.CLOSED }, 409)
-          : c.json(NOT_FOUND, 404)
+        if (result.reason === 'not_found') return c.json(NOT_FOUND, 404)
+        const reason = result.reason === 'closed' ? 'CLOSED' : 'STALE'
+        return c.json({ error: STAFF_UPDATE_ERRORS[reason], code: reason }, 409)
       }
       return c.json({ status: result.status, assigneeId: result.assigneeId }, 201)
     })

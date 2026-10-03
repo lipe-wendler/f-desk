@@ -24,6 +24,9 @@ vem de um achado real ou de uma garantia que o projeto já tem e não pode perde
       nunca concatenar texto vindo de fora. **(bloqueia)**
 - [ ] `ILIKE` escapa `\ % _` no termo buscado.
 - [ ] Escrita com várias tabelas usa `db.batch` (transacional no driver HTTP).
+- [ ] Escrita que depende do status lido (chamado fechado ou cancelado só aceita leitura) repete a
+      condição no `WHERE` do UPDATE (`unchangedSince`, `updateWithMessage` em `queries/ticket-writes.ts`);
+      ler e gravar depois deixa uma corrida desfazer o status final.
 - [ ] Migration nova: gerada por `pnpm db:generate`, sem dado de teste, testada num branch do Neon.
       Renomear ou apagar coluna segue o fluxo em duas tarefas de `docs/deploy.md`.
 

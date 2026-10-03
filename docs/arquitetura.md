@@ -95,10 +95,17 @@ Navegador ──► Vercel (mesmo domínio)
     gravada (`conversationId`) quando ela está completa no servidor, ou a transcrição do navegador
     (visitante que entrou para abrir o chamado), que vira uma conversa nova com as mensagens marcadas
     como `imported` (a equipe vê o aviso de trecho não verificado). Tudo num `batch` transacional. Devolve o código e o id da conversa ligada, que passa a ser a do atendimento.
-  - `GET /` (filtro `active`/`done`/`all`), `GET /:code` (mensagens sem as notas internas e a conversa de
-    origem), `POST /:code/messages` e `POST /:code/close`.
-  - Resposta do cliente em `waiting_client` ou `resolved` volta o chamado para `in_progress`; `closed` só
-    aceita leitura (409). O código `TKT-0001` é o identificador na URL.
+  - `GET /` (filtro `active`/`done`/`all`; "Encerrados" inclui os cancelados), `GET /:code` (mensagens sem
+    as notas internas, a conversa de origem e `canCancel`) e `POST /:code/messages`.
+  - **"Já resolvi"** (`POST /:code/close`): fecha o chamado com `close_reason = 'client_resolved'` e conta
+    como resolvido (`resolved_at`, se o técnico ainda não tinha marcado).
+  - **Cancelar** (`POST /:code/cancel`): só com o chamado `open` e sem resposta pública de alguém além do
+    cliente (nota interna não conta). A regra está no próprio UPDATE, então uma resposta da equipe no
+    mesmo instante impede o cancelamento; fora dela, 409 com `code: 'NOT_CANCELLABLE'`. Nada é apagado.
+  - As duas ações pedem confirmação num `FwDialog` em `/chamados/:codigo`; "Cancelar chamado" só aparece
+    com `canCancel`. Resposta, encerramento e cancelamento contam na cota `client-write`.
+  - Resposta do cliente em `waiting_client` ou `resolved` volta o chamado para `in_progress`; `closed` e
+    `cancelled` só aceitam leitura (409). O código `TKT-0001` é o identificador na URL.
 - **Conversas do cliente** (`/api/conversations`, só `client`): lista com título, tipo, última mensagem,
   primeira pergunta e o último chamado ligado (`q` busca no texto das mensagens, paginada por `page`/`pageSize`), e o detalhe com as
   mensagens. No atendimento, a sidebar lista as conversas por recência e `/atendimento/:conversa` abre
@@ -115,8 +122,18 @@ Navegador ──► Vercel (mesmo domínio)
   - `GET /tickets/:code` (com notas internas e dados do cliente), `POST /tickets/:code/messages`
     (resposta ou nota interna) e `PATCH /tickets/:code` (status, prioridade, responsável).
   - Regras em `packages/shared/src/staff.ts`: transições de `TICKET_STATUS_TRANSITIONS`, chamado fechado
-    não muda, só técnico ou admin ativo pode ser responsável, e as datas de resolução e fechamento são
-    gravadas na mudança. A primeira resposta pública num chamado aberto o coloca em atendimento e, sem
+    ou cancelado não muda (`isTicketTerminal`), cancelar é só do cliente (`CLIENT_ONLY_STATUSES`, a opção
+    nem aparece e a API responde 409 `CLIENT_ONLY`), só técnico ou admin ativo pode ser responsável, e as
+    datas de resolução e fechamento são gravadas na mudança (fechar pela equipe grava
+    `close_reason = 'staff'`). A tela mostra "Cancelado pelo cliente" ou "Resolvido pelo cliente".
+  - **Escritas condicionais:** as regras são decididas sobre o chamado lido, e a gravação só vale se ele
+    ainda estiver igual (`unchangedSince` em `queries/ticket-writes.ts`). Resposta pública grava mensagem
+    e status num comando só (`WITH upd AS (UPDATE …) INSERT … FROM upd`), nota interna só entra em
+    chamado não encerrado, e a resposta do cliente segue o mesmo padrão. Se o chamado mudou no meio do
+    caminho (um cancelamento, por exemplo), a escrita relê uma vez e, se ainda não der, responde 409
+    `STALE` ("O chamado mudou agora há pouco").
+  - Métrica "Resolvidos": chamados com `resolved_at` nos últimos 7 dias (equipe ou "Já resolvi");
+    cancelado nunca tem `resolved_at`, então não conta. A primeira resposta pública num chamado aberto o coloca em atendimento e, sem
     responsável, atribui a quem respondeu. Nota interna não muda status nem a data de atualização.
 - **Contexto da Wen:** a mensagem atual vai com uma nota dizendo se a pessoa está logada (as instruções
   fixas não mudam, para o prefixo continuar em cache).
@@ -135,12 +152,12 @@ falha (em produção, a versão anterior continua no ar). Fluxo em [deploy.md](d
 - **Limite do chat** (`chat.ts`): `chat_rate_limit` (key, window_start, count), janela fixa por chave.
 - **Chamados e conversas** (`tickets.ts`):
 
-| Tabela                 | Campos principais                                                                                                                                                                        |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `conversation`         | id, user_id (nulo para visitante), title e kind (dados pelo bot; nulos nas antigas), status (`open`/`resolved`), created_at, updated_at                                                  |
-| `conversation_message` | id (sequencial, define a ordem), conversation_id, role (`user`/`assistant`), content, source (`faq`/`llm`, só do assistente), ticket_id (fala que registra o chamado aberto), created_at |
-| `ticket`               | id, number + code (`TKT-0001`, gerados pelo banco), client_id, assignee_id, subject, description, status, priority, conversation_id, created/updated/resolved/closed_at                  |
-| `ticket_message`       | id (sequencial), ticket_id, author_id, content, internal (nota só da equipe), created_at                                                                                                 |
+| Tabela                 | Campos principais                                                                                                                                                                               |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `conversation`         | id, user_id (nulo para visitante), title e kind (dados pelo bot; nulos nas antigas), status (`open`/`resolved`), created_at, updated_at                                                         |
+| `conversation_message` | id (sequencial, define a ordem), conversation_id, role (`user`/`assistant`), content, source (`faq`/`llm`, só do assistente), ticket_id (fala que registra o chamado aberto), created_at        |
+| `ticket`               | id, number + code (`TKT-0001`, gerados pelo banco), client_id, assignee_id, subject, description, status, priority, conversation_id, created/updated/resolved/closed/cancelled_at, close_reason |
+| `ticket_message`       | id (sequencial), ticket_id, author_id, content, internal (nota só da equipe), created_at                                                                                                        |
 
 - **Código do chamado:** `number` é uma coluna identity e `code` é uma coluna gerada a partir dele
   (`formatTicketCode` no shared segue o mesmo formato). A numeração não depende de transação na API, o
@@ -150,7 +167,11 @@ falha (em produção, a versão anterior continua no ar). Fluxo em [deploy.md](d
 - **Histórico preservado:** `ticket.client_id` e `ticket_message.author_id` usam `restrict`; o
   responsável e a conversa de origem viram `null` se forem apagados. Contas não são apagadas, só desativadas.
 - **Status:** `open` → `in_progress` / `waiting_client` → `resolved` → `closed`. `resolved` pode ser
-  reaberto; `closed` é final (as transições ficam em `TICKET_STATUS_TRANSITIONS`).
+  reaberto; `closed` é final (as transições ficam em `TICKET_STATUS_TRANSITIONS`). `open` → `cancelled`
+  só pelo cliente, e `cancelled` também é final.
+- **Motivo do fechamento** (`close_reason`, CHECK com `TICKET_CLOSE_REASONS`): `client_resolved` ("Já
+  resolvi"), `staff` (a equipe fechou) e `client_closed` (o cliente encerrou sem dizer que resolveu;
+  nenhuma tela grava esse valor hoje). Nulo nos chamados fechados antes da migration `0007`.
 - Datas das tabelas novas são `timestamp with time zone`; as do better-auth seguem como ele gera.
 
 ## Rotas do web
@@ -183,5 +204,5 @@ falha (em produção, a versão anterior continua no ar). Fluxo em [deploy.md](d
 15. ~~`chore/revisao-de-seguranca-com-claude`~~ — concluída
 16. ~~`feat/criar-conta-pelo-cartao-de-chamado`~~ — concluída
 17. ~~`chore/conferir-migrations-pendentes-no-deploy`~~ — concluída ([fluxo de migrations](deploy.md#a-cada-mudança-no-banco-migrations))
-18. `feat/cancelar-e-resolver-chamado-pelo-cliente`
+18. ~~`feat/cancelar-e-resolver-chamado-pelo-cliente`~~ — concluída
 19. `feat/wen-consulta-e-acoes-em-chamados`

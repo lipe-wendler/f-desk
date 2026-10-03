@@ -7,6 +7,7 @@ import {
   DEFAULT_TICKET_PRIORITY,
   DEFAULT_TICKET_STATUS,
   REQUEST_KIND_IDS,
+  TICKET_CLOSE_REASONS,
   TICKET_PRIORITIES,
   TICKET_STATUSES,
 } from '@f-desk/shared'
@@ -98,6 +99,7 @@ export const conversationMessage = pgTable(
  * Chamado. `number` vem de uma sequência do banco e `code` (`TKT-0001`) é gerado a partir dele,
  * então a numeração não depende de transação na aplicação (o driver HTTP não tem transação interativa).
  * Contas não são apagadas (são desativadas), e o `restrict` em `client_id` garante o histórico.
+ * Nada é apagado: cancelar é um status final (`cancelled`), como fechar.
  */
 export const ticket = pgTable(
   'ticket',
@@ -128,6 +130,10 @@ export const ticket = pgTable(
     updatedAt: updatedAt(),
     resolvedAt: timestamp('resolved_at', { withTimezone: true }),
     closedAt: timestamp('closed_at', { withTimezone: true }),
+    /** Cancelado pelo cliente (status `cancelled`). */
+    cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+    /** Quem fechou e por quê (`TICKET_CLOSE_REASONS`); nulo nos fechados antes da tarefa 18. */
+    closeReason: text('close_reason', { enum: TICKET_CLOSE_REASONS }),
   },
   (table) => [
     index('ticket_client_id_created_at_idx').on(table.clientId, table.createdAt.desc()),
@@ -139,6 +145,7 @@ export const ticket = pgTable(
     ),
     check('ticket_status_check', oneOf(table.status, TICKET_STATUSES)),
     check('ticket_priority_check', oneOf(table.priority, TICKET_PRIORITIES)),
+    check('ticket_close_reason_check', oneOf(table.closeReason, TICKET_CLOSE_REASONS)),
   ],
 )
 

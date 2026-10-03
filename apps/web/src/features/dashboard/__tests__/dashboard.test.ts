@@ -113,6 +113,8 @@ describe('StaffTicketPage', () => {
     description: 'Erro de autenticação.',
     resolvedAt: null,
     closedAt: null,
+    cancelledAt: null,
+    closeReason: null,
     messages: [
       {
         id: 1,
@@ -188,5 +190,42 @@ describe('StaffTicketPage', () => {
     expect(wrapper.findAll('select').every((s) => s.attributes('disabled') !== undefined)).toBe(
       true,
     )
+  })
+  it('mostra quando o cliente cancelou ou resolveu, e fica só leitura', async () => {
+    for (const [over, label, readOnly] of [
+      [
+        { status: 'cancelled', cancelledAt: '2026-10-03T10:00:00.000Z' },
+        'Cancelado pelo cliente',
+        'Chamado cancelado pelo cliente: só leitura.',
+      ],
+      [
+        { status: 'closed', closeReason: 'client_resolved' },
+        'Resolvido pelo cliente',
+        'Chamado fechado: só leitura.',
+      ],
+    ] as const) {
+      mockApi({
+        'GET /staff/assignees': () => jsonResponse({ assignees: [] }),
+        'GET /staff/tickets/TKT-0007': () => jsonResponse(detail(over)),
+      })
+      const wrapper = await mountAt(StaffTicketPage, '/tecnico/chamados/TKT-0007')
+      expect(wrapper.get('[data-testid="ended-by-client"]').text()).toBe(label)
+      expect(wrapper.text()).toContain(readOnly)
+      expect(wrapper.find('textarea').exists()).toBe(false)
+      expect(wrapper.findAll('select').every((s) => s.attributes('disabled') !== undefined)).toBe(
+        true,
+      )
+      wrapper.unmount()
+    }
+  })
+
+  it('fechado pela equipe não diz que foi o cliente', async () => {
+    mockApi({
+      'GET /staff/assignees': () => jsonResponse({ assignees: [] }),
+      'GET /staff/tickets/TKT-0007': () =>
+        jsonResponse(detail({ status: 'closed', closeReason: 'staff' })),
+    })
+    const wrapper = await mountAt(StaffTicketPage, '/tecnico/chamados/TKT-0007')
+    expect(wrapper.find('[data-testid="ended-by-client"]').exists()).toBe(false)
   })
 })

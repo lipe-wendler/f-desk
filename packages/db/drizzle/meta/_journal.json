@@ -50,6 +50,13 @@
       "when": 1790983330123,
       "tag": "0006_conversa-mensagem-importada",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791049561631,
+      "tag": "0007_chamado-cancelado-e-motivo-de-fechamento",
+      "breakpoints": true
     }
   ]
 }

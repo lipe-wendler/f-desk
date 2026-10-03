@@ -20,7 +20,7 @@ describe('planTicketUpdate', () => {
     })
     expect(planTicketUpdate(open, { status: 'closed' })).toEqual({
       ok: true,
-      changes: { status: 'closed', closedAt: 'now' },
+      changes: { status: 'closed', closedAt: 'now', closeReason: 'staff' },
     })
   })
 
@@ -33,6 +33,22 @@ describe('planTicketUpdate', () => {
       ok: false,
       error: 'CLOSED',
     })
+  })
+
+  it('a equipe não cancela chamado, e chamado cancelado não muda mais', () => {
+    expect(planTicketUpdate(open, { status: 'cancelled' })).toEqual({
+      ok: false,
+      error: 'CLIENT_ONLY',
+    })
+    for (const input of [
+      { priority: 'high' as const },
+      { status: 'open' as const },
+      { assigneeId: 't1' },
+    ])
+      expect(planTicketUpdate({ status: 'cancelled', assigneeId: null }, input)).toEqual({
+        ok: false,
+        error: 'CLOSED',
+      })
   })
 
   it('status igual não é transição; prioridade e responsável passam direto', () => {
@@ -152,6 +168,35 @@ describe('/staff', () => {
     ).toBe(409)
   })
 
+  it('resposta e alteração num chamado que mudou no meio do caminho dão 409', async () => {
+    store.reply.mockResolvedValue({ ok: false, reason: 'conflict' })
+    const reply = await appAs(tech).request(
+      '/staff/tickets/TKT-0001/messages',
+      send('POST', { content: 'oi' }),
+    )
+    expect(reply.status).toBe(409)
+    expect(await reply.json()).toMatchObject({ code: 'STALE' })
+
+    store.reply.mockResolvedValue({ ok: false, reason: 'closed' })
+    const closed = await appAs(tech).request(
+      '/staff/tickets/TKT-0001/messages',
+      send('POST', { content: 'oi' }),
+    )
+    expect(closed.status).toBe(409)
+    expect(await closed.json()).toMatchObject({ code: 'CLOSED' })
+
+    store.update.mockResolvedValue({ ok: false, reason: 'STALE' })
+    const update = await appAs(tech).request(
+      '/staff/tickets/TKT-0001',
+      send('PATCH', { status: 'resolved' }),
+    )
+    expect(update.status).toBe(409)
+    expect(await update.json()).toEqual({
+      error: 'O chamado mudou agora há pouco. Recarregue e tente de novo.',
+      code: 'STALE',
+    })
+  })
+
   it('alteração: valida o corpo e traduz os erros das regras', async () => {
     expect((await appAs(tech).request('/staff/tickets/TKT-0001', send('PATCH', {}))).status).toBe(
       400,
@@ -168,6 +213,17 @@ describe('/staff', () => {
     )
     expect(invalid.status).toBe(409)
     expect(await invalid.json()).toMatchObject({ code: 'INVALID_TRANSITION' })
+
+    store.update.mockResolvedValue({ ok: false, reason: 'CLIENT_ONLY' })
+    const cancel = await appAs(tech).request(
+      '/staff/tickets/TKT-0001',
+      send('PATCH', { status: 'cancelled' }),
+    )
+    expect(cancel.status).toBe(409)
+    expect(await cancel.json()).toEqual({
+      error: 'Só o cliente pode cancelar o chamado.',
+      code: 'CLIENT_ONLY',
+    })
 
     store.update.mockResolvedValue({ ok: false, reason: 'INVALID_ASSIGNEE' })
     expect(

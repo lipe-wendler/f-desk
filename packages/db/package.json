@@ -6,7 +6,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./schema": "./src/schema/index.ts",
-    "./migrations": "./src/migrations-status.ts"
+    "./migrations": "./src/migrations-status.ts",
+    "./ticket-writes": "./src/queries/ticket-writes.ts"
   },
   "scripts": {
     "generate": "node --env-file-if-exists=../../.env --env-file-if-exists=../../.env.local ./node_modules/drizzle-kit/bin.cjs generate",

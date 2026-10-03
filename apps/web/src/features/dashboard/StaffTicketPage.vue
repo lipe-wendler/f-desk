@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import {
+  CLIENT_ONLY_STATUSES,
+  isTicketTerminal,
   TICKET_MESSAGE_MAX,
   TICKET_PRIORITIES,
   TICKET_PRIORITY_LABEL,
@@ -38,13 +40,23 @@ const sending = ref(false)
 const saving = ref(false)
 
 const code = computed(() => String(route.params.id))
-const isClosed = computed(() => ticket.value?.status === 'closed')
+const isClosed = computed(() => (ticket.value ? isTicketTerminal(ticket.value.status) : false))
+/** Como o chamado foi encerrado, quando foi o cliente (a equipe vê no topo e no rodapé). */
+const endedByClient = computed(() => {
+  const t = ticket.value
+  if (t?.status === 'cancelled') return 'Cancelado pelo cliente'
+  if (t?.status === 'closed' && t.closeReason === 'client_resolved') return 'Resolvido pelo cliente'
+  return null
+})
 const isMine = computed(() => ticket.value?.assignee?.id === session.user?.id)
 
 const statusOptions = computed(() => {
   const current = ticket.value?.status
   if (!current) return []
-  return [current, ...TICKET_STATUS_TRANSITIONS[current]].map((s) => ({
+  // Cancelar é só do cliente: a opção nem aparece para a equipe (a API também recusa).
+  const clientOnly: readonly TicketStatus[] = CLIENT_ONLY_STATUSES
+  const next = TICKET_STATUS_TRANSITIONS[current].filter((s) => !clientOnly.includes(s))
+  return [current, ...next].map((s) => ({
     value: s,
     label: TICKET_STATUS_LABEL[s],
   }))
@@ -139,6 +151,9 @@ void staffApi.assignees().then((r) => {
         </h1>
         <div class="flex flex-wrap items-center gap-3 text-sm text-ink-muted">
           <TicketStatusTag :status="ticket.status" />
+          <span v-if="endedByClient" class="font-semibold text-ink" data-testid="ended-by-client">
+            {{ endedByClient }}
+          </span>
           <span>{{ ticket.client.name }} · {{ ticket.client.email }}</span>
           <span>Aberto em {{ formatDateTime(ticket.createdAt) }}</span>
         </div>
@@ -193,7 +208,13 @@ void staffApi.assignees().then((r) => {
           </FwButton>
         </div>
       </form>
-      <p v-else class="m-0 text-sm text-ink-muted">Chamado fechado: só leitura.</p>
+      <p v-else class="m-0 text-sm text-ink-muted">
+        {{
+          ticket.status === 'cancelled'
+            ? 'Chamado cancelado pelo cliente: só leitura.'
+            : 'Chamado fechado: só leitura.'
+        }}
+      </p>
     </section>
 
     <aside class="flex flex-col gap-6">

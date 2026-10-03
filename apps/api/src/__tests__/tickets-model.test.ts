@@ -1,5 +1,9 @@
 import {
   ACTIVE_TICKET_STATUSES,
+  CLIENT_ONLY_STATUSES,
+  TERMINAL_TICKET_STATUSES,
+  canClientCancel,
+  isTicketTerminal,
   TICKET_STATUSES,
   TICKET_STATUS_TRANSITIONS,
   canChangeTicketStatus,
@@ -36,6 +40,24 @@ describe('status do chamado', () => {
     expect(canChangeTicketStatus('resolved', 'in_progress')).toBe(true)
     expect(canChangeTicketStatus('resolved', 'open')).toBe(false)
     for (const to of TICKET_STATUSES) expect(canChangeTicketStatus('closed', to)).toBe(false)
+  })
+
+  it('cancelar só sai de "Aberto", é só do cliente e é final, como fechado', () => {
+    for (const from of TICKET_STATUSES)
+      expect(canChangeTicketStatus(from, 'cancelled')).toBe(from === 'open')
+    for (const to of TICKET_STATUSES) expect(canChangeTicketStatus('cancelled', to)).toBe(false)
+    expect(CLIENT_ONLY_STATUSES).toEqual(['cancelled'])
+    expect(TERMINAL_TICKET_STATUSES).toEqual(['closed', 'cancelled'])
+    expect(TICKET_STATUSES.filter(isTicketTerminal)).toEqual(['closed', 'cancelled'])
+    expect(isTicketActive('cancelled')).toBe(false)
+  })
+
+  it('o cliente cancela enquanto está aberto e só ele escreveu em público', () => {
+    expect(canClientCancel('open', [], 'c1')).toBe(true)
+    expect(canClientCancel('open', ['c1', 'c1'], 'c1')).toBe(true)
+    expect(canClientCancel('open', ['c1', 't1'], 'c1')).toBe(false)
+    for (const status of TICKET_STATUSES.filter((s) => s !== 'open'))
+      expect(canClientCancel(status, [], 'c1')).toBe(false)
   })
 
   it('todo status ativo pode ser resolvido ou fechado', () => {
