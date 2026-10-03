@@ -66,17 +66,29 @@ Navegador ──► Vercel (mesmo domínio)
       com assunto e descrição, "Abrir chamado", "Ajustar" (edição no próprio box) e "Agora não". Só a
       proposta mais nova fica à espera. Aberta ou descartada, ela vira um registro na conversa e o foco
       volta ao campo. Confirmar chama `POST /api/tickets`,
-      que confere o perfil. Visitante vê "Entre para abrirmos o seu chamado" e a conversa segue depois do
-      login; a equipe vê que só clientes abrem chamados.
+      que confere o perfil. A sessão é conferida de novo quando a proposta chega (a tela carrega a sessão
+      uma vez, e ela pode ter acabado em outra aba); enquanto isso, o box não mostra ação.
+    - **Visitante:** "Crie sua conta para abrirmos o chamado. Sua conversa com a Wen fica guardada.", com
+      "Criar conta" (principal) e "Já tenho conta". Os links levam `?redirect=/atendimento&motivo=chamado`:
+      o cadastro e o login mostram a faixa "Falta pouco para abrir seu chamado" (só com o `motivo`, porque
+      a sidebar também manda `redirect=/atendimento`) e voltam para o atendimento, onde a proposta
+      continua à espera (fica no `localStorage` com a conversa).
+    - **No login,** a conversa do visitante vira uma conversa da conta (`POST /api/conversations/import`)
+      antes de qualquer outra coisa: aparece na sidebar, o contexto do chat passa a vir do banco e "Abrir
+      chamado" usa o `conversationId`, sem reenviar a transcrição. Se a importação falhar, a conversa
+      continua parcial: o chamado leva a transcrição, como antes, e a importação é tentada de novo na
+      próxima carga.
+    - **Equipe logada:** "Você está com uma conta da equipe; chamados são abertos por clientes."
     - Depois de aberto, o cabeçalho passa a "Chamado TKT-xxxx" e a API grava na conversa a fala do Wen
       que registra o chamado (`ticketCreatedReply`), ligada a ele por `conversation_message.ticket_id`.
       O cartão com o código e o link aparece sob essa fala, inclusive ao reabrir a conversa; o LLM vê a
       fala e não propõe outro chamado. A proposta pendente ou descartada fica só no navegador.
   - **Limite:** 20 mensagens a cada 10 minutos por conta ou por IP, contado no Postgres
     (`chat_rate_limit`; serverless não compartilha memória). O IP é guardado como hash.
-  - **Contexto:** logado com `conversationId`, o histórico que vai ao LLM vem do banco
-    (`getConversationHistory`), ou fica vazio se a conversa não for dele; o `history` enviado só vale
-    sem conversa gravada (visitante, ou quem entrou no meio da conversa).
+  - **Contexto:** logado, o histórico que vai ao LLM vem só do banco: com `conversationId`, o gravado
+    (`getConversationHistory`), ou nenhum se a conversa não for dele; sem `conversationId`, nenhum. O
+    `history` enviado só vale para o visitante (afeta só a conversa dele). Quem entrou no meio da
+    conversa tem o começo importado no login.
 
 - **Chamados do cliente** (`/api/tickets`, só `client`, só os próprios; de outra pessoa a resposta é 404):
   - `POST /` abre o chamado (só pela proposta do Wen no atendimento). A conversa com a Wen vai junto: a
@@ -91,6 +103,9 @@ Navegador ──► Vercel (mesmo domínio)
   primeira pergunta e o último chamado ligado (`q` busca no texto das mensagens, paginada por `page`/`pageSize`), e o detalhe com as
   mensagens. No atendimento, a sidebar lista as conversas por recência e `/atendimento/:conversa` abre
   uma delas.
+  - `POST /import` recebe a transcrição do navegador (o mesmo schema da transcrição do chamado, de 1 a
+    100 mensagens) e cria a conversa com o `user_id` da sessão e as mensagens marcadas como `imported`,
+    num `batch`. Conta na cota `client-write` e aceita corpo de até 2 MB, como abrir chamado.
 
 - **Dashboard da equipe** (`/api/staff`, só `technician` e `admin`):
   - `GET /metrics` (cards), `GET /assignees` (técnicos e admins ativos), `GET /tickets` (filas `active`,
@@ -161,6 +176,6 @@ Schema em `packages/db/src/schema`; status, prioridades e papéis das mensagens 
 13. ~~`feat/abertura-de-chamado-pelo-chatbot`~~ — concluída
 14. ~~`fix/diagnostico-e-correcoes-de-seguranca`~~ — concluída ([diagnóstico](seguranca/diagnostico-2026-10.md))
 15. ~~`chore/revisao-de-seguranca-com-claude`~~ — concluída
-16. `feat/criar-conta-pelo-cartao-de-chamado`
+16. ~~`feat/criar-conta-pelo-cartao-de-chamado`~~ — concluída
 17. `feat/cancelar-e-resolver-chamado-pelo-cliente`
 18. `feat/wen-consulta-e-acoes-em-chamados`
