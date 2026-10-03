@@ -11,19 +11,49 @@
    - `fix(api): corrige-permissao-do-tecnico`
    - Escopos usados: `web`, `api`, `ui`, `db`, `shared`, `config`.
 4. **PR ao terminar a tarefa**, com título no mesmo padrão (ele vira a mensagem do squash) e o template preenchido.
-5. **Merge só por squash** na `main`. A branch é apagada depois do merge.
+5. **Revisão de segurança antes do merge**: `/revisao-de-seguranca <número do PR>` no Claude Code (o
+   Claude roda sozinho logo depois de abrir o PR). Com veredito **Bloqueado**, não faça o merge até
+   os achados serem corrigidos (é regra do fluxo; o GitHub não impede, veja abaixo). Veja [Revisão de segurança](#revisão-de-segurança).
+6. **Merge só por squash** na `main`. A branch é apagada depois do merge.
 
 ## O que garante isso
 
-| Onde                                   | Checagem                                                                                   |
-| -------------------------------------- | ------------------------------------------------------------------------------------------ |
-| Hook `commit-msg` (Husky + commitlint) | Mensagem em Conventional Commits com descrição em kebab-case                               |
-| Hook `pre-push`                        | Bloqueia push na `main` e nomes de branch fora do padrão                                   |
-| CI (`.github/workflows/ci.yml`)        | Nome da branch, título do PR, commits da branch, Prettier, lint, typecheck, testes e build |
+| Onde                                           | Checagem                                                                                                        |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Hook `commit-msg` (Husky + commitlint)         | Mensagem em Conventional Commits com descrição em kebab-case                                                    |
+| Hook `pre-push`                                | Bloqueia push para a `main` (inclusive `HEAD:main`) e nomes de branch fora do padrão                            |
+| Hooks do Claude Code (`.claude/settings.json`) | Lembram a `/revisao-de-seguranca` depois de abrir um PR e impedem o Claude de fazer merge ou escrever na `main` |
+| CI (`.github/workflows/ci.yml`)                | Nome da branch, título do PR, commits da branch, Prettier, lint, typecheck, testes e build                      |
 
 ## Configuração no GitHub (manual, uma vez)
 
 - _Settings → General → Pull Requests_: deixar marcado só **Allow squash merging** e ativar
   **Automatically delete head branches**.
-- _Settings → Branches_: regra para `main` com **Require a pull request before merging** e
-  **Require status checks to pass** (job `checks`, `branch-name` e `pr-title` do CI).
+- _Settings → Rules → Rulesets_: ruleset `main` com **Require a pull request before merging** (0
+  aprovações), **Require status checks to pass** (`checks`, `branch-name` e `pr-title`), **Restrict
+  deletions** e **Block force pushes**. Já está criado, mas **o GitHub só aplica rulesets e branch
+  protection em repositório privado nos planos pagos** (Pro, Team): no plano gratuito ele fica
+  salvo e inativo. **Enquanto isso, nada no servidor protege a `main`:** o hook `pre-push` só
+  lembra (cai com `--no-verify`, e escrita pela API do GitHub nem passa por ele), e o veredito da
+  revisão de segurança é um aviso que depende de quem faz o merge respeitá-lo. Para ativar de
+  verdade, assine o GitHub Pro ou torne o repositório público.
+
+## Revisão de segurança
+
+Rodada padronizada com o Claude Code antes de cada merge, sem GitHub Actions:
+
+- **Skill** `.claude/skills/revisao-de-seguranca/`: `/revisao-de-seguranca [número do PR]`. Monta o
+  escopo (diff do PR ou da branch contra a `main`), chama o auditor, confere os achados graves e
+  publica o relatório como comentário no PR.
+- **Subagent** `.claude/agents/auditor-de-seguranca.md`: só lê (sem `Write`/`Edit`), aplica o
+  [checklist](../.claude/skills/revisao-de-seguranca/checklist.md) e devolve achados com arquivo,
+  linha, cenário de exploração, severidade e veredito (**Liberado**, **Liberado com ressalvas** ou
+  **Bloqueado**).
+- **Hook** `PostToolUse` em `.claude/settings.json`: quando o Claude abre um PR (MCP do GitHub ou
+  `gh pr create`), injeta o lembrete de rodar a revisão naquele PR.
+- **O Claude não faz merge nem escreve na `main`**: o hook `PreToolUse`
+  (`.claude/hooks/proteger-main.mjs`) e as regras `deny` do `.claude/settings.json` recusam merge e
+  auto-merge de PR (MCP e `gh pr merge`), escrita na `main` pela API do GitHub, push para a `main` e
+  push com os hooks do Git desligados (`--no-verify`, `HUSKY=0`). O merge é sempre seu.
+- O checklist nasce do [diagnóstico de segurança](seguranca/diagnostico-2026-10.md). Achado novo
+  que vale para todo PR entra nos dois.

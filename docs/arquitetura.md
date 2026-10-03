@@ -159,7 +159,7 @@ Schema em `packages/db/src/schema`; status, prioridades e papéis das mensagens 
 12. ~~`feat/fluxos-guiados-e-novo-visual-do-chat`~~ — concluída
 13. ~~`feat/abertura-de-chamado-pelo-chatbot`~~ — concluída
 14. ~~`fix/diagnostico-e-correcoes-de-seguranca`~~ — concluída ([diagnóstico](seguranca/diagnostico-2026-10.md))
-15. `chore/revisao-de-seguranca-com-claude`
+15. ~~`chore/revisao-de-seguranca-com-claude`~~ — concluída
 16. `feat/criar-conta-pelo-cartao-de-chamado`
 17. `feat/cancelar-e-resolver-chamado-pelo-cliente`
 18. `feat/wen-consulta-e-acoes-em-chamados`

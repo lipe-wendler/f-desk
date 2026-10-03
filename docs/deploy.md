@@ -117,6 +117,8 @@ respondendo pelo FAQ e orienta a abrir um chamado.
 ## Agentes (Claude Code)
 
 - Skills da Neon em `.claude/skills/neon*` (atualize com `neon skills update`).
+- Revisão de segurança antes do merge: skill `/revisao-de-seguranca`, subagent
+  `auditor-de-seguranca` e hook em `.claude/settings.json` (detalhes em `docs/git-workflow.md`).
 - MCP da Neon em `.mcp.json`, fixado no projeto `divine-haze-24115227`. O login acontece no primeiro uso
   (OAuth), então nenhuma chave fica no repositório.
 
