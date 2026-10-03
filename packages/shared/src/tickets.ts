@@ -7,6 +7,7 @@ export const TICKET_STATUSES = [
   'waiting_client',
   'resolved',
   'closed',
+  'cancelled',
 ] as const
 export type TicketStatus = (typeof TICKET_STATUSES)[number]
 
@@ -23,6 +24,7 @@ export const TICKET_STATUS_LABEL: Record<TicketStatus, string> = {
   waiting_client: 'Aguardando cliente',
   resolved: 'Resolvido',
   closed: 'Fechado',
+  cancelled: 'Cancelado',
 }
 
 export const TICKET_PRIORITY_LABEL: Record<TicketPriority, string> = {
@@ -41,15 +43,33 @@ export const ACTIVE_TICKET_STATUSES = [
 
 /**
  * Para onde cada status pode ir. `resolved` ainda pode ser reaberto (o cliente responde que não
- * resolveu); `closed` é final, e um problema novo vira outro chamado.
+ * resolveu); `closed` e `cancelled` são finais, e um problema novo vira outro chamado.
+ * `open → cancelled` é só do cliente (`CLIENT_ONLY_STATUSES`), enquanto ninguém da equipe respondeu.
  */
 export const TICKET_STATUS_TRANSITIONS: Record<TicketStatus, readonly TicketStatus[]> = {
-  open: ['in_progress', 'waiting_client', 'resolved', 'closed'],
+  open: ['in_progress', 'waiting_client', 'resolved', 'closed', 'cancelled'],
   in_progress: ['open', 'waiting_client', 'resolved', 'closed'],
   waiting_client: ['in_progress', 'resolved', 'closed'],
   resolved: ['in_progress', 'closed'],
   closed: [],
+  cancelled: [],
 }
+
+/** Status finais: o chamado só aceita leitura. */
+export const TERMINAL_TICKET_STATUSES = [
+  'closed',
+  'cancelled',
+] as const satisfies readonly TicketStatus[]
+
+/** Status que só o cliente define (a equipe não cancela chamado de ninguém). */
+export const CLIENT_ONLY_STATUSES = ['cancelled'] as const satisfies readonly TicketStatus[]
+
+/**
+ * Por que o chamado foi fechado: o cliente disse que resolveu ("Já resolvi"), o cliente encerrou
+ * sem dizer que resolveu, ou a equipe fechou. Nulo nos chamados fechados antes da tarefa 18.
+ */
+export const TICKET_CLOSE_REASONS = ['client_resolved', 'client_closed', 'staff'] as const
+export type TicketCloseReason = (typeof TICKET_CLOSE_REASONS)[number]
 
 export function isTicketStatus(value: unknown): value is TicketStatus {
   return typeof value === 'string' && (TICKET_STATUSES as readonly string[]).includes(value)
@@ -57,6 +77,23 @@ export function isTicketStatus(value: unknown): value is TicketStatus {
 
 export function isTicketActive(status: TicketStatus): boolean {
   return (ACTIVE_TICKET_STATUSES as readonly TicketStatus[]).includes(status)
+}
+
+/** Fechado ou cancelado: não recebe resposta nem muda mais. */
+export function isTicketTerminal(status: TicketStatus): boolean {
+  return (TERMINAL_TICKET_STATUSES as readonly TicketStatus[]).includes(status)
+}
+
+/**
+ * O cliente pode cancelar enquanto o chamado está aberto e ninguém além dele respondeu em público
+ * (nota interna não conta). A rota de cancelamento repete a regra no próprio UPDATE.
+ */
+export function canClientCancel(
+  status: TicketStatus,
+  publicAuthorIds: readonly string[],
+  clientId: string,
+): boolean {
+  return status === 'open' && publicAuthorIds.every((id) => id === clientId)
 }
 
 export function canChangeTicketStatus(from: TicketStatus, to: TicketStatus): boolean {
@@ -192,6 +229,10 @@ export interface TicketDetail extends TicketSummary {
   description: string
   resolvedAt: string | null
   closedAt: string | null
+  cancelledAt: string | null
+  closeReason: TicketCloseReason | null
+  /** O cliente ainda pode cancelar (aberto e sem resposta pública da equipe). */
+  canCancel: boolean
   assigneeName: string | null
   messages: TicketThreadMessage[]
   /** Conversa com a Wen que originou o chamado. */

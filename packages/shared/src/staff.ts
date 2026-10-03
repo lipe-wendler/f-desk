@@ -1,7 +1,10 @@
 import { z } from 'zod'
 import {
   canChangeTicketStatus,
+  CLIENT_ONLY_STATUSES,
+  isTicketTerminal,
   TICKET_PRIORITIES,
+  type TicketCloseReason,
   type TicketPriority,
   type TicketStatus,
   type TicketSummary,
@@ -31,7 +34,8 @@ export const staffQueueQuerySchema = z.object({
 export type StaffQueueQuery = z.infer<typeof staffQueueQuerySchema>
 
 export const STAFF_UPDATE_ERRORS = {
-  CLOSED: 'Chamado fechado não pode ser alterado.',
+  CLOSED: 'Chamado fechado ou cancelado não pode ser alterado.',
+  CLIENT_ONLY: 'Só o cliente pode cancelar o chamado.',
   INVALID_TRANSITION: 'Essa mudança de status não é permitida.',
   INVALID_ASSIGNEE: 'Escolha um técnico ou admin ativo.',
 } as const
@@ -49,27 +53,35 @@ export interface TicketChanges {
   assigneeId?: string | null
   resolvedAt?: 'now' | null
   closedAt?: 'now'
+  closeReason?: TicketCloseReason
 }
 
 /**
  * Valida a alteração feita pela equipe e devolve o que mudar. Status igual ao atual não conta
- * como transição; chamado fechado não muda mais. Sair de "Resolvido" limpa a data de resolução.
+ * como transição; chamado fechado ou cancelado não muda mais, e cancelar é só do cliente. Sair de
+ * "Resolvido" limpa a data de resolução; fechar grava que foi a equipe.
  */
 export function planTicketUpdate(
   current: TicketState,
   input: UpdateTicketInput,
 ): { ok: true; changes: TicketChanges } | { ok: false; error: StaffUpdateError } {
-  if (current.status === 'closed') return { ok: false, error: 'CLOSED' }
+  if (isTicketTerminal(current.status)) return { ok: false, error: 'CLOSED' }
   const changes: TicketChanges = {}
 
   if (input.status && input.status !== current.status) {
+    if ((CLIENT_ONLY_STATUSES as readonly TicketStatus[]).includes(input.status)) {
+      return { ok: false, error: 'CLIENT_ONLY' }
+    }
     if (!canChangeTicketStatus(current.status, input.status)) {
       return { ok: false, error: 'INVALID_TRANSITION' }
     }
     changes.status = input.status
     if (input.status === 'resolved') changes.resolvedAt = 'now'
     else if (current.status === 'resolved') changes.resolvedAt = null
-    if (input.status === 'closed') changes.closedAt = 'now'
+    if (input.status === 'closed') {
+      changes.closedAt = 'now'
+      changes.closeReason = 'staff'
+    }
   }
   if (input.priority) changes.priority = input.priority
   if (input.assigneeId !== undefined) changes.assigneeId = input.assigneeId
@@ -111,6 +123,8 @@ export interface StaffTicketDetail extends StaffTicketSummary {
   description: string
   resolvedAt: string | null
   closedAt: string | null
+  cancelledAt: string | null
+  closeReason: TicketCloseReason | null
   messages: StaffThreadMessage[]
   transcript: TranscriptMessage[]
 }

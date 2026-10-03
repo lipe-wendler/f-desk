@@ -1,5 +1,11 @@
-import { ticketCreatedReply, type ChatMessage, type TicketStatus } from '@f-desk/shared'
-import { and, asc, count, desc, eq, inArray, sql, type SQL } from 'drizzle-orm'
+import {
+  canClientCancel,
+  TERMINAL_TICKET_STATUSES,
+  ticketCreatedReply,
+  type ChatMessage,
+  type TicketStatus,
+} from '@f-desk/shared'
+import { and, asc, count, desc, eq, inArray, notInArray, sql, type SQL } from 'drizzle-orm'
 import { db } from '../client'
 import { conversation, conversationMessage, ticket, ticketMessage } from '../schema'
 
@@ -87,10 +93,10 @@ export async function createTicket({
   return created!
 }
 
-/** Filtros da lista do cliente: em aberto (pedem ação) ou encerrados (resolvidos e fechados). */
+/** Filtros da lista do cliente: em aberto (pedem ação) ou encerrados (resolvidos, fechados e cancelados). */
 export const TICKET_SCOPES = {
   active: ['open', 'in_progress', 'waiting_client'],
-  done: ['resolved', 'closed'],
+  done: ['resolved', 'closed', 'cancelled'],
 } as const satisfies Record<string, readonly TicketStatus[]>
 export type TicketScope = keyof typeof TICKET_SCOPES | 'all'
 
@@ -147,6 +153,8 @@ export async function getClientTicket(clientId: string, code: string) {
       updatedAt: true,
       resolvedAt: true,
       closedAt: true,
+      cancelledAt: true,
+      closeReason: true,
     },
     with: {
       assignee: { columns: { name: true } },
@@ -171,6 +179,11 @@ export async function getClientTicket(clientId: string, code: string) {
   const { assignee, messages, conversation: origin, ...rest } = found
   return {
     ...rest,
+    canCancel: canClientCancel(
+      rest.status,
+      messages.map((m) => m.author.id),
+      clientId,
+    ),
     assigneeName: assignee?.name ?? null,
     messages: messages.map((m) => ({
       id: m.id,
@@ -190,7 +203,7 @@ export type ClientReplyResult =
 
 /**
  * Resposta do cliente. Se o chamado esperava por ele ou estava resolvido, volta para
- * "Em atendimento" (resolvido + resposta = o problema voltou). Fechado não aceita resposta.
+ * "Em atendimento" (resolvido + resposta = o problema voltou). Fechado ou cancelado não aceita resposta.
  */
 export async function addClientReply(
   clientId: string,
@@ -199,7 +212,7 @@ export async function addClientReply(
 ): Promise<ClientReplyResult> {
   const found = await findClientTicket(clientId, code)
   if (!found) return { ok: false, reason: 'not_found' }
-  if (found.status === 'closed') return { ok: false, reason: 'closed' }
+  if (isTerminal(found.status)) return { ok: false, reason: 'closed' }
 
   const reopen = found.status === 'waiting_client' || found.status === 'resolved'
   const status: TicketStatus = reopen ? 'in_progress' : found.status
@@ -217,20 +230,75 @@ export async function addClientReply(
   return { ok: true, status }
 }
 
-/** O cliente encerra o próprio chamado (resolvido, ou desistiu do atendimento). */
+const isTerminal = (status: TicketStatus) =>
+  (TERMINAL_TICKET_STATUSES as readonly TicketStatus[]).includes(status)
+
+/**
+ * "Já resolvi": o cliente fecha o próprio chamado dizendo que resolveu. Conta como resolvido (a data
+ * de resolução fica a do técnico, se já havia). Fechado ou cancelado: 409. O UPDATE só vale para
+ * chamado ainda não encerrado, então uma mudança da equipe no meio do caminho não é sobrescrita.
+ */
 export async function closeClientTicket(
   clientId: string,
   code: string,
 ): Promise<{ ok: true } | { ok: false; reason: 'not_found' | 'closed' }> {
-  const found = await findClientTicket(clientId, code)
-  if (!found) return { ok: false, reason: 'not_found' }
-  if (found.status === 'closed') return { ok: false, reason: 'closed' }
   const now = new Date()
-  await db
+  const [updated] = await db
     .update(ticket)
-    .set({ status: 'closed', closedAt: now, updatedAt: now })
-    .where(eq(ticket.id, found.id))
-  return { ok: true }
+    .set({
+      status: 'closed',
+      closeReason: 'client_resolved',
+      closedAt: now,
+      resolvedAt: sql`coalesce(${ticket.resolvedAt}, ${now})`,
+      updatedAt: now,
+    })
+    .where(
+      and(
+        eq(ticket.code, code),
+        eq(ticket.clientId, clientId),
+        notInArray(ticket.status, [...TERMINAL_TICKET_STATUSES]),
+      ),
+    )
+    .returning({ id: ticket.id })
+  if (updated) return { ok: true }
+  return (await findClientTicket(clientId, code))
+    ? { ok: false, reason: 'closed' }
+    : { ok: false, reason: 'not_found' }
+}
+
+/** Resposta pública de alguém que não é o dono do chamado (nota interna não conta). */
+const staffAnswered = sql`exists (
+  select 1 from ${ticketMessage}
+  where ${ticketMessage.ticketId} = ${ticket.id}
+    and ${ticketMessage.internal} = false
+    and ${ticketMessage.authorId} <> ${ticket.clientId})`
+
+/**
+ * O cliente cancela o próprio chamado enquanto ele está aberto e ninguém da equipe respondeu em
+ * público (`canClientCancel`). Tudo num UPDATE só, com a regra no WHERE: se a equipe responder ao
+ * mesmo tempo, o cancelamento não passa. Nada é apagado.
+ */
+export async function cancelClientTicket(
+  clientId: string,
+  code: string,
+): Promise<{ ok: true } | { ok: false; reason: 'not_found' | 'not_cancellable' }> {
+  const now = new Date()
+  const [updated] = await db
+    .update(ticket)
+    .set({ status: 'cancelled', cancelledAt: now, updatedAt: now })
+    .where(
+      and(
+        eq(ticket.code, code),
+        eq(ticket.clientId, clientId),
+        eq(ticket.status, 'open'),
+        sql`not ${staffAnswered}`,
+      ),
+    )
+    .returning({ id: ticket.id })
+  if (updated) return { ok: true }
+  return (await findClientTicket(clientId, code))
+    ? { ok: false, reason: 'not_cancellable' }
+    : { ok: false, reason: 'not_found' }
 }
 
 /** Conversas do usuário com a Wen, da mais recente para a mais antiga. `search` procura no texto das mensagens. */

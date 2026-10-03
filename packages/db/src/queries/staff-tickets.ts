@@ -1,5 +1,6 @@
 import {
   ACTIVE_TICKET_STATUSES,
+  isTicketTerminal,
   planTicketUpdate,
   staffReplyEffects,
   STAFF_ROLES,
@@ -18,7 +19,7 @@ import { conversationMessage, ticket, ticketMessage, user } from '../schema'
 const client = alias(user, 'client')
 const assignee = alias(user, 'assignee')
 
-const DONE_STATUSES = ['resolved', 'closed'] as const satisfies readonly TicketStatus[]
+const DONE_STATUSES = ['resolved', 'closed', 'cancelled'] as const satisfies readonly TicketStatus[]
 
 /** Urgente primeiro; dentro da mesma prioridade, o chamado mais antigo. */
 const priorityRank = sql`case ${ticket.priority} when 'urgent' then 0 when 'high' then 1 when 'medium' then 2 else 3 end`
@@ -87,7 +88,11 @@ export async function listStaffTickets(params: StaffQueueParams) {
   return { tickets: rows, total: totalRow?.n ?? 0 }
 }
 
-/** Números dos cards do dashboard, numa consulta só. */
+/**
+ * Números dos cards do dashboard, numa consulta só. "Resolvidos" conta `resolved_at`: a equipe
+ * marcando como resolvido ou o cliente no "Já resolvi". Cancelado nunca tem `resolved_at` (só sai de
+ * "Aberto"), então não conta.
+ */
 export async function getStaffMetrics(staffId: string) {
   const active = sql`${ticket.status} in ('open', 'in_progress', 'waiting_client')`
   const [row] = await db
@@ -117,6 +122,8 @@ export async function getStaffTicket(code: string) {
       updatedAt: true,
       resolvedAt: true,
       closedAt: true,
+      cancelledAt: true,
+      closeReason: true,
     },
     with: {
       client: { columns: { name: true, email: true } },
@@ -159,6 +166,7 @@ const toColumns = (changes: TicketChanges) => {
     ...(changes.assigneeId !== undefined ? { assigneeId: changes.assigneeId } : {}),
     ...(changes.resolvedAt !== undefined ? { resolvedAt: changes.resolvedAt ? now : null } : {}),
     ...(changes.closedAt ? { closedAt: now } : {}),
+    ...(changes.closeReason ? { closeReason: changes.closeReason } : {}),
     updatedAt: now,
   }
 }
@@ -167,7 +175,10 @@ export type StaffReplyResult =
   | { ok: true; status: TicketStatus; assigneeId: string | null }
   | { ok: false; reason: 'not_found' | 'closed' }
 
-/** Resposta pública ou nota interna da equipe. Nota interna não mexe em status nem na data de atualização. */
+/**
+ * Resposta pública ou nota interna da equipe. Nota interna não mexe em status nem na data de
+ * atualização. Chamado fechado ou cancelado só aceita leitura.
+ */
 export async function addStaffReply(
   staffId: string,
   code: string,
@@ -176,7 +187,7 @@ export async function addStaffReply(
 ): Promise<StaffReplyResult> {
   const found = await findTicketState(code)
   if (!found) return { ok: false, reason: 'not_found' }
-  if (found.status === 'closed') return { ok: false, reason: 'closed' }
+  if (isTicketTerminal(found.status)) return { ok: false, reason: 'closed' }
 
   const effects = staffReplyEffects(found, staffId, internal)
   const insert = db
