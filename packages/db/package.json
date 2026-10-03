@@ -5,14 +5,17 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./schema": "./src/schema/index.ts"
+    "./schema": "./src/schema/index.ts",
+    "./migrations": "./src/migrations-status.ts"
   },
   "scripts": {
     "generate": "node --env-file-if-exists=../../.env --env-file-if-exists=../../.env.local ./node_modules/drizzle-kit/bin.cjs generate",
     "migrate": "tsx --env-file-if-exists=../../.env --env-file-if-exists=../../.env.local src/migrate.ts",
     "studio": "node --env-file-if-exists=../../.env --env-file-if-exists=../../.env.local ./node_modules/drizzle-kit/bin.cjs studio",
     "lint": "eslint .",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "migrations:check-deploy": "tsx src/check-migrations.ts",
+    "check": "tsx --env-file-if-exists=../../.env --env-file-if-exists=../../.env.local src/check-migrations.ts --check"
   },
   "dependencies": {
     "@f-desk/shared": "workspace:*",

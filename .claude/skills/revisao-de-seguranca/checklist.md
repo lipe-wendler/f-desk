@@ -61,6 +61,8 @@ vem de um achado real ou de uma garantia que o projeto já tem e não pode perde
 - [ ] Variável de ambiente nova sensível é obrigatória na Vercel em `apps/api/src/env.ts`
       (`isProduction`), sem valor padrão público.
 - [ ] Log não registra corpo, senha, token, e-mail ou query string de busca.
+- [ ] Script de build ou CLI que fala com o banco não imprime erro cru do driver (a mensagem pode trazer
+      a connection string): só nome e código (`safeErrorSummary` em `@f-desk/db/migrations`).
 - [ ] Erro novo para o cliente não expõe stack, SQL ou detalhe interno (o `onApiError` cuida do 500).
 - [ ] Cabeçalhos de segurança (`vercel.json` e `apiSecureHeaders`) e `apiCsrf` continuam aplicados.
 

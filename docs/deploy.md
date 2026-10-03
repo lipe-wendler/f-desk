@@ -10,12 +10,22 @@ O deploy é automático: todo push numa branch com PR gera um **preview**, e o m
 
 Um único projeto Vercel (`f-desk`) a partir da raiz do repositório. O `vercel.json` já define:
 
-- **Build**: `pnpm turbo run build --filter=web --filter=api` → site em `apps/web/dist` e a API empacotada
-  em `apps/api/dist/app.js`.
+- **Build**: primeiro `pnpm --filter @f-desk/db migrations:check-deploy` (confere as migrations, veja
+  abaixo), depois `pnpm turbo run build --filter=web --filter=api` → site em `apps/web/dist` e a API
+  empacotada em `apps/api/dist/app.js`.
 - **Function**: `api/index.js` atende `/api/*` (rewrite) com o app Hono.
 - **SPA**: qualquer outra rota cai em `index.html` (Vue Router).
 
-O build nunca roda migrations: um deploy não altera o banco.
+O build nunca aplica migrations: um deploy não altera o banco. Ele só **confere** se o banco do deploy
+tem todas as migrations do código (`packages/db/src/check-migrations.ts`) e falha se faltar alguma:
+
+- **Produção:** o deploy falha e a versão anterior continua no ar. Evita publicar código que depende de
+  uma coluna que o `production` não tem (foi assim que a `0006` ficou fora do banco e o chamado com
+  transcrição passou a dar 500, na tarefa 16).
+- **Preview:** o deploy do PR fica vermelho até a migration entrar no branch `preview/<branch-git>`.
+- Migration alterada depois de aplicada (hash diferente) também falha o build.
+- Fora da Vercel (CI, máquina local) a conferência não roda. Para conferir o banco do `.env.local`:
+  `pnpm db:check`.
 
 ## Configuração inicial (uma vez)
 
@@ -72,16 +82,18 @@ Fluxo de um PR com migration:
 
 1. **Gerar e versionar:** mudar `packages/db/src/schema`, rodar `pnpm db:generate --name <descricao>` e
    commitar o SQL e o `meta/` gerados.
-2. **Preview:** depois que a Vercel criar o branch `preview/<branch-git>` do Neon (no primeiro deploy do
-   PR), aplicar a migration nele e testar o preview:
+2. **Preview:** o primeiro deploy do PR cria o branch `preview/<branch-git>` do Neon e falha na
+   conferência, porque a migration ainda não está nele. Aplicar a migration nesse branch, refazer o deploy
+   (_Deployments → Redeploy_ ou um push novo) e testar o preview:
    ```bash
    neon checkout preview/<branch-git> && pnpm db:migrate
    ```
 3. **Produção, logo antes do merge:**
    ```bash
-   neon checkout production && pnpm db:migrate
+   neon checkout production && pnpm db:migrate && pnpm db:check
    ```
-4. **Merge** do PR (squash).
+4. **Merge** do PR (squash). Se o passo 3 ficou para trás, o deploy de produção falha na conferência e a
+   versão anterior continua no ar: aplique a migration e faça _Redeploy_.
 5. **Limpeza:** apagar o branch `preview/<branch-git>` no Neon. A integração não apaga sozinha.
 
 Confira o `NEON_BRANCH` no `.env.local` antes de cada `pnpm db:migrate`. O Claude também pode fazer os
@@ -140,7 +152,13 @@ Os logs mostram `[chat] LLM desligado`: falta a chave do provedor do `LLM_MODEL`
 formato `<provedor>:<modelo>`. Cadastre a chave e faça um redeploy. Se aparecer `[chat] falha ao gerar
 resposta`, a chave existe, mas o provedor recusou (chave inválida, cota ou modelo inexistente).
 
-### Erro de tabela inexistente num preview ou em produção
+### Deploy falhou com `[migrations] Migration pendente no banco`
 
-A migration do PR não foi aplicada naquele branch do Neon. Siga o
+O banco daquele deploy não tem uma migration do código. O log diz qual e onde aplicar (branch do preview
+ou `production`). Siga o [fluxo de migrations](#a-cada-mudança-no-banco-migrations) e refaça o deploy.
+
+### Erro de tabela ou coluna inexistente num preview ou em produção
+
+Não deveria mais acontecer, porque o build confere as migrations. Se acontecer (por exemplo, num deploy
+anterior a essa conferência), confira o branch com `pnpm db:check` e siga o
 [fluxo de migrations](#a-cada-mudança-no-banco-migrations).
