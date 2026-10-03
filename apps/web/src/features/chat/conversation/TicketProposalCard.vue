@@ -6,7 +6,7 @@ import {
   type TicketProposal,
 } from '@f-desk/shared'
 import { FwButton, FwIcon, FwInput, FwTextarea } from '@f-desk/ui'
-import { computed, nextTick, reactive, ref, useId, useTemplateRef } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, useId, useTemplateRef } from 'vue'
 import FormAlert from '../../../components/FormAlert.vue'
 import { useFieldErrors } from '../../../composables/useFieldErrors'
 import { useChatStore, type ProposalState } from '../../../stores/chat'
@@ -14,9 +14,9 @@ import { useSessionStore } from '../../../stores/session'
 
 /**
  * Chamado que o Wen preparou. Nada é aberto sem o cliente: ele confere, ajusta se quiser e
- * confirma. Visitante precisa entrar (a conversa segue depois do login); a equipe não abre chamado.
- * Pendente, fica fixo acima do campo de mensagem; descartado, vira uma nota na conversa (o chamado
- * aberto aparece em `TicketCreatedCard`, sob a fala do Wen que o registra).
+ * confirma. Visitante cria a conta ou entra (a conversa e a proposta seguem depois do login); a
+ * equipe não abre chamado. Pendente, fica fixo acima do campo de mensagem; descartado, vira uma
+ * nota na conversa (o chamado aberto aparece em `TicketCreatedCard`, sob a fala do Wen que o registra).
  */
 type ConfirmResult = Awaited<ReturnType<ReturnType<typeof useChatStore>['confirmProposal']>>
 
@@ -34,9 +34,26 @@ const titleId = useId()
 const root = useTemplateRef<HTMLElement>('root')
 
 const proposal = computed(() => props.proposal)
+/**
+ * Quem vê o cartão decide as ações. A sessão é conferida de novo quando a proposta chega: a tela
+ * carrega a sessão uma vez, e um visitante com sessão antiga na memória (saiu em outra aba, a
+ * sessão venceu) via o texto da equipe no lugar do convite para criar a conta.
+ */
 const audience = computed(() =>
-  !session.user ? 'visitor' : session.user.role === 'client' ? 'client' : 'staff',
+  session.checking
+    ? 'checking'
+    : !session.user
+      ? 'visitor'
+      : session.user.role === 'client'
+        ? 'client'
+        : 'staff',
 )
+/** Volta para o atendimento depois do login; `motivo` faz o cadastro e o login mostrarem a faixa. */
+const authQuery = { redirect: '/atendimento', motivo: 'chamado' }
+
+onMounted(() => {
+  if (props.proposal.state === 'pending') void session.refresh()
+})
 
 const editing = ref(false)
 const submitting = ref(false)
@@ -168,27 +185,27 @@ function dismiss() {
           </div>
         </template>
 
+        <p v-else-if="audience === 'checking'" class="m-0 text-sm text-ink-muted" role="status">
+          Conferindo sua conta…
+        </p>
+
         <template v-else-if="audience === 'visitor'">
           <p class="m-0 text-sm">
-            Entre para abrirmos o seu chamado. A conversa continua de onde parou.
+            Crie sua conta para abrirmos o chamado. Sua conversa com a Wen fica guardada.
           </p>
           <div class="flex flex-wrap gap-2">
-            <FwButton :to="{ name: 'sign-in', query: { redirect: '/atendimento' } }" size="sm">
-              Entrar
-            </FwButton>
-            <FwButton
-              :to="{ name: 'sign-up', query: { redirect: '/atendimento' } }"
-              variant="secondary"
-              size="sm"
-            >
-              Criar conta
+            <FwButton :to="{ name: 'sign-up', query: authQuery }" size="sm">Criar conta</FwButton>
+            <FwButton :to="{ name: 'sign-in', query: authQuery }" variant="secondary" size="sm">
+              Já tenho conta
             </FwButton>
             <FwButton variant="ghost" size="sm" @click="dismiss">Agora não</FwButton>
           </div>
         </template>
 
         <div v-else class="flex flex-wrap items-center justify-between gap-2">
-          <p class="m-0 text-sm text-ink-muted">Só clientes abrem chamados.</p>
+          <p class="m-0 text-sm text-ink-muted">
+            Você está com uma conta da equipe; chamados são abertos por clientes.
+          </p>
           <FwButton variant="ghost" size="sm" @click="dismiss">Fechar</FwButton>
         </div>
       </template>

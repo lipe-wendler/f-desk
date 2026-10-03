@@ -1,4 +1,5 @@
 import type {
+  ChatMessage,
   ConversationDetail,
   ConversationStatus,
   ConversationSummary,
@@ -46,6 +47,12 @@ export const conversationsApi = {
     )
   },
   get: (id: string) => apiFetch<ConversationDetail>(`/conversations/${encodeURIComponent(id)}`),
+  /** Conversa do visitante levada para a conta no login: devolve o id da conversa criada. */
+  import: (transcript: ChatMessage[]) =>
+    apiFetch<{ conversationId: string }>('/conversations/import', {
+      method: 'POST',
+      body: JSON.stringify({ transcript }),
+    }),
   /** "Resolveu" / "Não resolveu": grava na conversa e devolve o status novo. */
   feedback: (id: string, resolved: boolean) =>
     apiFetch<{ status: ConversationStatus }>(`/conversations/${encodeURIComponent(id)}/feedback`, {

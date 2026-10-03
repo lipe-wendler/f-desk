@@ -153,6 +153,8 @@ export const useChatStore = defineStore('chat', () => {
     // Sempre o objeto reativo dentro do array, para as mudanças aparecerem na tela.
     const reply = messages.value[messages.value.length - 1]!
     sending.value = true
+    // Conversa sendo levada para a conta: a mensagem vai para ela, não para uma conversa nova.
+    if (importing) await importing
 
     const result = await streamChat(
       { message, history, conversationId: conversationId.value, faqId: options.faqId },
@@ -291,6 +293,8 @@ export const useChatStore = defineStore('chat', () => {
     const entry = messages.value.find((m) => m.id === entryId)
     if (!entry?.proposal || entry.proposal.state !== 'pending')
       return { ok: false, error: 'Esta proposta não está mais disponível.' }
+    // Importação em andamento: o chamado vai com a conversa gravada, sem reenviar a transcrição.
+    if (importing) await importing
     const result = await ticketsApi.create({ ...input, ...ticketAttachment.value })
     if (result.error !== null) return { ok: false, error: result.error, fields: result.fields }
     const { code } = result.data
@@ -325,6 +329,35 @@ export const useChatStore = defineStore('chat', () => {
     const entry = messages.value.find((m) => m.id === entryId)
     if (entry?.proposal?.state === 'pending')
       entry.proposal = { ...entry.proposal, state: 'dismissed' }
+  }
+
+  let importing: Promise<boolean> | null = null
+
+  /**
+   * Conversa do visitante que entrou como cliente (pelo cartão do chamado, por exemplo): vira uma
+   * conversa da conta (`POST /conversations/import`, mensagens marcadas como importadas). A partir
+   * daí ela aparece na sidebar, o contexto do chat vem do banco e o chamado usa o `conversationId`.
+   * Se falhar, a conversa continua parcial (o chamado leva a transcrição) e a importação é tentada
+   * de novo na próxima carga. Devolve true quando importou.
+   */
+  function importPartial(): Promise<boolean> {
+    if (importing) return importing
+    const history = transcript.value.slice(-TRANSCRIPT_MAX)
+    if (!partial.value || conversationId.value || !history.length) return Promise.resolve(false)
+    const owner = ownerId.value
+    importing = conversationsApi
+      .import(history)
+      .then(({ data }) => {
+        // Trocou de conta ou de conversa no meio do caminho: nada muda aqui.
+        if (!data || ownerId.value !== owner || !partial.value || conversationId.value) return false
+        conversationId.value = data.conversationId
+        partial.value = false
+        return true
+      })
+      .finally(() => {
+        importing = null
+      })
+    return importing
   }
 
   /** Abre uma conversa gravada no servidor (lista da sidebar). Devolve false se ela não existe para esta conta. */
@@ -390,6 +423,7 @@ export const useChatStore = defineStore('chat', () => {
     giveFeedback,
     confirmProposal,
     dismissProposal,
+    importPartial,
     loadConversation,
     reset,
   }
