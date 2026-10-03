@@ -61,6 +61,7 @@ describe('insertNoteIfOpen', () => {
     const [{ sql, params }] = queries as [{ sql: string; params: unknown[] }]
     expect(sql).toContain('"ticket"."status" not in ($')
     expect(sql).toMatch(/, true from "ticket"/)
+    expect(sql).toContain('for share of "ticket"')
     expect(params).toEqual(expect.arrayContaining(['tech', 'nota', 't-1', 'closed', 'cancelled']))
   })
 })

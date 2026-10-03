@@ -40,12 +40,16 @@ export async function updateWithMessage(
   return rows.length > 0
 }
 
-/** Nota interna: grava só se o chamado não estiver fechado ou cancelado, sem mexer nele. */
+/**
+ * Nota interna: grava só se o chamado não estiver fechado ou cancelado, sem mexer nele. O
+ * `for share` espera um cancelamento em andamento terminar e reavalia o status.
+ */
 export async function insertNoteIfOpen(ticketId: string, authorId: string, content: string) {
   const { rows } = await db.execute(sql`
     insert into ${ticketMessage} (ticket_id, author_id, content, internal)
     select ${ticket.id}, ${authorId}, ${content}, true from ${ticket}
     where ${and(eq(ticket.id, ticketId), notInArray(ticket.status, [...TERMINAL_TICKET_STATUSES]))}
+    for share of ${ticket}
     returning id`)
   return rows.length > 0
 }
