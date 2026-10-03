@@ -156,7 +156,9 @@ function appAs(
     )
     .route(
       '/conversations',
-      createConversationsRoute(conversationStore as unknown as ConversationStore),
+      createConversationsRoute(conversationStore as unknown as ConversationStore, {
+        write: limits.write,
+      }),
     )
     .route('/staff', createStaffRoute(staffStore as unknown as StaffStore, { write: limits.staff }))
 }
@@ -249,6 +251,15 @@ describe('limite de escrita', () => {
     expect((await app.request('/tickets/TKT-0001/close', json({}))).status).toBe(429)
     expect(ticketStore.reply).not.toHaveBeenCalled()
     expect(ticketStore.close).not.toHaveBeenCalled()
+  })
+
+  it('feedback de conversa conta na cota de escrita do cliente', async () => {
+    const res = await appAs(clientA, { write: blocked }).request(
+      '/conversations/33333333-3333-4333-8333-333333333333/feedback',
+      json({ resolved: true }),
+    )
+    expect(res.status).toBe(429)
+    expect(conversationStore.feedback).not.toHaveBeenCalled()
   })
 
   it('a equipe também tem limite para responder e alterar chamados', async () => {

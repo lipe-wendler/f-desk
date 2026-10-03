@@ -74,8 +74,9 @@ Navegador ──► Vercel (mesmo domínio)
       fala e não propõe outro chamado. A proposta pendente ou descartada fica só no navegador.
   - **Limite:** 20 mensagens a cada 10 minutos por conta ou por IP, contado no Postgres
     (`chat_rate_limit`; serverless não compartilha memória). O IP é guardado como hash.
-  - **Contexto:** com conversa gravada do usuário, o histórico que vai ao LLM vem do banco
-    (`getConversationHistory`), não do corpo da requisição; o `history` enviado só vale para visitante.
+  - **Contexto:** logado com `conversationId`, o histórico que vai ao LLM vem do banco
+    (`getConversationHistory`), ou fica vazio se a conversa não for dele; o `history` enviado só vale
+    sem conversa gravada (visitante, ou quem entrou no meio da conversa).
 
 - **Chamados do cliente** (`/api/tickets`, só `client`, só os próprios; de outra pessoa a resposta é 404):
   - `POST /` abre o chamado (só pela proposta do Wen no atendimento). A conversa com a Wen vai junto: a

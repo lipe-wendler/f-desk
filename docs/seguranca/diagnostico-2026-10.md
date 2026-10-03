@@ -61,13 +61,16 @@ O que já estava bom e continua valendo:
    trecho não é verificado e marca cada fala dele. Mensagens importadas antes da migration não têm a
    marca (não há como distingui-las com segurança).
 5. ✅ **Histórico do chat editável pelo navegador.** O contexto do LLM vinha do `history` do corpo,
-   inclusive com falas `assistant`. **Correção:** com conversa gravada do usuário, o contexto vem do
-   banco (`getConversationHistory`); o `history` do corpo só vale para visitante (afeta só ele mesmo).
+   inclusive com falas `assistant`. **Correção:** com usuário logado e `conversationId`, o contexto vem
+   do banco (`getConversationHistory`), ou fica vazio se a conversa não for dele. O `history` do corpo
+   só vale sem conversa gravada: visitante (afeta só ele) e quem entrou no meio da conversa (a tarefa
+   16 passa a importar essa conversa no login, e então o corpo deixa de valer para logados).
 6. ✅ **Escritas sem limite.** Abrir chamado, responder e as ações da equipe não tinham cota: dava para
    encher a fila da equipe. **Correção:** `limitPerUser` (`services/rate-limit.ts`) com contadores na
    mesma tabela do chat, por bucket: 5 chamados/hora, 30 escritas do cliente e 120 da equipe a cada
    10 minutos (`TICKET_CREATE_LIMIT`, `TICKET_WRITE_LIMIT`, `STAFF_WRITE_LIMIT`). A tabela passa a ser
-   limpa aos poucos (janelas com mais de 1 dia).
+   limpa aos poucos (janelas com mais de 1 dia; por isso `CHAT_RATE_WINDOW_SECONDS` vai até 86400).
+   O feedback de conversa ("Resolveu?") entrou depois, achado pela primeira `/revisao-de-seguranca`.
 7. ✅ **Força bruta no login.** O padrão do better-auth é 3 tentativas a cada 10 s por IP (~18 senhas
    por minuto). **Correção:** `/sign-in/email` com 10 a cada 5 minutos e `/sign-up/email` com 5 por
    hora, por IP. O limite do better-auth só vale em produção (padrão da biblioteca).

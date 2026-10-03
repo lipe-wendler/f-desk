@@ -76,7 +76,7 @@ export function createTicketsRoute(store: ClientTicketStore, limits: ClientTicke
       const found = await store.get(c.get('user')!.id, code)
       return found ? c.json(found) : c.json(NOT_FOUND, 404)
     })
-    .post('/:code/messages', limitPerUser('ticket-write', limits.write), async (c) => {
+    .post('/:code/messages', limitPerUser('client-write', limits.write), async (c) => {
       const code = c.req.param('code')
       if (!TICKET_CODE_PATTERN.test(code)) return c.json(NOT_FOUND, 404)
       const parsed = ticketMessageSchema.safeParse(await c.req.json().catch(() => null))
@@ -89,7 +89,7 @@ export function createTicketsRoute(store: ClientTicketStore, limits: ClientTicke
         return result.reason === 'closed' ? c.json(CLOSED, 409) : c.json(NOT_FOUND, 404)
       return c.json({ status: result.status }, 201)
     })
-    .post('/:code/close', limitPerUser('ticket-write', limits.write), async (c) => {
+    .post('/:code/close', limitPerUser('client-write', limits.write), async (c) => {
       const code = c.req.param('code')
       if (!TICKET_CODE_PATTERN.test(code)) return c.json(NOT_FOUND, 404)
       const result = await store.close(c.get('user')!.id, code)

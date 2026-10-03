@@ -92,11 +92,14 @@ app.route(
 )
 app.route(
   '/conversations',
-  createConversationsRoute({
-    list: listConversations,
-    get: getConversation,
-    feedback: saveConversationFeedback,
-  }),
+  createConversationsRoute(
+    {
+      list: listConversations,
+      get: getConversation,
+      feedback: saveConversationFeedback,
+    },
+    { write: createQuota(env.TICKET_WRITE_LIMIT, 600, consumeChatQuota) },
+  ),
 )
 
 app.route(

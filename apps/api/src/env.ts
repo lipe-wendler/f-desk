@@ -38,10 +38,11 @@ const schema = z.object({
   XAI_API_KEY: z.string().optional(),
   /** Mensagens por janela no chat, por IP (visitante) ou por conta (logado). */
   CHAT_RATE_LIMIT: z.coerce.number().int().min(1).default(20),
-  CHAT_RATE_WINDOW_SECONDS: z.coerce.number().int().min(1).default(600),
+  // Até 1 dia: a faxina de `consumeChatQuota` apaga janelas com mais de 1 dia.
+  CHAT_RATE_WINDOW_SECONDS: z.coerce.number().int().min(1).max(86_400).default(600),
   /** Chamados abertos por hora, por cliente. */
   TICKET_CREATE_LIMIT: z.coerce.number().int().min(1).default(5),
-  /** Respostas e encerramentos do cliente a cada 10 minutos. */
+  /** Respostas, encerramentos e feedback de conversa do cliente a cada 10 minutos. */
   TICKET_WRITE_LIMIT: z.coerce.number().int().min(1).default(30),
   /** Respostas e alterações de chamado da equipe a cada 10 minutos, por pessoa. */
   STAFF_WRITE_LIMIT: z.coerce.number().int().min(1).default(120),

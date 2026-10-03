@@ -4,6 +4,7 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import { requireRole } from '../middleware/require-role'
 import type { AppEnv } from '../middleware/session'
+import { limitPerUser, type ConsumeQuota } from '../services/rate-limit'
 
 export interface ConversationStore {
   list: typeof listConversations
@@ -23,7 +24,10 @@ const listQuerySchema = z.object({
 const NOT_FOUND = { error: 'Conversa não encontrada.' }
 
 /** Histórico das conversas do cliente com a Wen (gravadas pelo chat quando ele está logado). */
-export function createConversationsRoute(store: ConversationStore) {
+export function createConversationsRoute(
+  store: ConversationStore,
+  limits: { write?: ConsumeQuota } = {},
+) {
   return (
     new Hono<AppEnv>()
       .use('*', requireRole('client'))
@@ -41,7 +45,7 @@ export function createConversationsRoute(store: ConversationStore) {
       })
       // "Resolveu" / "Não resolveu" depois de uma resposta pronta: vira mensagem da conversa e muda o status.
       // Os textos são os do atendimento guiado; o cliente só diz se resolveu.
-      .post('/:id/feedback', async (c) => {
+      .post('/:id/feedback', limitPerUser('client-write', limits.write), async (c) => {
         const id = z.uuid().safeParse(c.req.param('id'))
         if (!id.success) return c.json(NOT_FOUND, 404)
         const body = feedbackSchema.safeParse(await c.req.json().catch(() => null))

@@ -74,11 +74,13 @@ export function createChatRoute(deps: ChatDeps) {
           )
         }
 
-        const saved =
-          user && conversationId && deps.loadHistory
-            ? await deps.loadHistory(user.id, conversationId)
-            : null
-        const history = saved ?? parsed.data.history
+        // Logado com conversa: o contexto é o gravado (ou nenhum, se a conversa não for dele; o
+        // `saveExchange` abre uma nova). O `history` do corpo só vale sem conversa gravada: visitante
+        // ou quem entrou no meio da conversa e ainda não tem nada gravado.
+        const usesSaved = Boolean(user && conversationId && deps.loadHistory)
+        const history = usesSaved
+          ? ((await deps.loadHistory!(user!.id, conversationId!)) ?? [])
+          : parsed.data.history
 
         // Opção do atendimento guiado: a resposta pronta escolhida, sem depender da busca por palavras.
         const chosen = faqId ? FAQ.find((entry) => entry.id === faqId) : undefined
