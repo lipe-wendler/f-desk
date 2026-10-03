@@ -15,6 +15,12 @@ import { and, asc, count, desc, eq, ilike, inArray, isNull, or, sql, type SQL } 
 import { alias } from 'drizzle-orm/pg-core'
 import { db } from '../client'
 import { conversationMessage, ticket, ticketMessage, user } from '../schema'
+import {
+  insertNoteIfOpen,
+  unchangedSince,
+  updateWithMessage,
+  WRITE_ATTEMPTS,
+} from './ticket-writes'
 
 const client = alias(user, 'client')
 const assignee = alias(user, 'assignee')
@@ -173,11 +179,13 @@ const toColumns = (changes: TicketChanges) => {
 
 export type StaffReplyResult =
   | { ok: true; status: TicketStatus; assigneeId: string | null }
-  | { ok: false; reason: 'not_found' | 'closed' }
+  | { ok: false; reason: 'not_found' | 'closed' | 'conflict' }
 
 /**
  * Resposta pública ou nota interna da equipe. Nota interna não mexe em status nem na data de
- * atualização. Chamado fechado ou cancelado só aceita leitura.
+ * atualização. Chamado fechado ou cancelado só aceita leitura, e a regra vale também na gravação:
+ * a resposta pública grava mensagem e status juntos só se o chamado não mudou desde a leitura
+ * (`updateWithMessage`), e a nota só entra em chamado ainda não encerrado. Se mudou, relê uma vez.
  */
 export async function addStaffReply(
   staffId: string,
@@ -185,26 +193,30 @@ export async function addStaffReply(
   content: string,
   internal: boolean,
 ): Promise<StaffReplyResult> {
-  const found = await findTicketState(code)
-  if (!found) return { ok: false, reason: 'not_found' }
-  if (isTicketTerminal(found.status)) return { ok: false, reason: 'closed' }
+  for (let attempt = 0; attempt < WRITE_ATTEMPTS; attempt++) {
+    const found = await findTicketState(code)
+    if (!found) return { ok: false, reason: 'not_found' }
+    if (isTicketTerminal(found.status)) return { ok: false, reason: 'closed' }
 
-  const effects = staffReplyEffects(found, staffId, internal)
-  const insert = db
-    .insert(ticketMessage)
-    .values({ ticketId: found.id, authorId: staffId, content, internal })
-  if (internal) await insert
-  else {
-    await db.batch([
-      insert,
-      db.update(ticket).set(toColumns(effects)).where(eq(ticket.id, found.id)),
-    ])
+    if (internal) {
+      if (await insertNoteIfOpen(found.id, staffId, content))
+        return { ok: true, status: found.status, assigneeId: found.assigneeId }
+      continue
+    }
+    const effects = staffReplyEffects(found, staffId, internal)
+    const update = db
+      .update(ticket)
+      .set(toColumns(effects))
+      .where(unchangedSince(found))
+      .returning({ id: ticket.id })
+    if (await updateWithMessage(update, { authorId: staffId, content }))
+      return {
+        ok: true,
+        status: effects.status ?? found.status,
+        assigneeId: effects.assigneeId !== undefined ? effects.assigneeId : found.assigneeId,
+      }
   }
-  return {
-    ok: true,
-    status: effects.status ?? found.status,
-    assigneeId: effects.assigneeId !== undefined ? effects.assigneeId : found.assigneeId,
-  }
+  return { ok: false, reason: 'conflict' }
 }
 
 /** Técnicos e admins ativos, para atribuir chamados. */
@@ -221,20 +233,31 @@ export async function listAssignees() {
 export type StaffUpdateResult =
   { ok: true } | { ok: false; reason: 'not_found' } | { ok: false; reason: StaffUpdateError }
 
-/** Status, prioridade e responsável. As regras ficam em `planTicketUpdate` (`@f-desk/shared`). */
+/**
+ * Status, prioridade e responsável. As regras ficam em `planTicketUpdate` (`@f-desk/shared`) e são
+ * decididas sobre o estado lido; o UPDATE só vale se o chamado ainda estiver assim (um cancelamento
+ * do cliente no meio do caminho não é desfeito). Se mudou, relê e decide de novo uma vez.
+ */
 export async function updateStaffTicket(
   code: string,
   input: UpdateTicketInput,
 ): Promise<StaffUpdateResult> {
-  const found = await findTicketState(code)
-  if (!found) return { ok: false, reason: 'not_found' }
-  const plan = planTicketUpdate(found, input)
-  if (!plan.ok) return { ok: false, reason: plan.error }
+  for (let attempt = 0; attempt < WRITE_ATTEMPTS; attempt++) {
+    const found = await findTicketState(code)
+    if (!found) return { ok: false, reason: 'not_found' }
+    const plan = planTicketUpdate(found, input)
+    if (!plan.ok) return { ok: false, reason: plan.error }
 
-  if (plan.changes.assigneeId) {
-    const valid = (await listAssignees()).some((a) => a.id === plan.changes.assigneeId)
-    if (!valid) return { ok: false, reason: 'INVALID_ASSIGNEE' }
+    if (plan.changes.assigneeId) {
+      const valid = (await listAssignees()).some((a) => a.id === plan.changes.assigneeId)
+      if (!valid) return { ok: false, reason: 'INVALID_ASSIGNEE' }
+    }
+    const [updated] = await db
+      .update(ticket)
+      .set(toColumns(plan.changes))
+      .where(unchangedSince(found))
+      .returning({ id: ticket.id })
+    if (updated) return { ok: true }
   }
-  await db.update(ticket).set(toColumns(plan.changes)).where(eq(ticket.id, found.id))
-  return { ok: true }
+  return { ok: false, reason: 'STALE' }
 }

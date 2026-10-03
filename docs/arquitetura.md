@@ -126,6 +126,12 @@ Navegador ──► Vercel (mesmo domínio)
     nem aparece e a API responde 409 `CLIENT_ONLY`), só técnico ou admin ativo pode ser responsável, e as
     datas de resolução e fechamento são gravadas na mudança (fechar pela equipe grava
     `close_reason = 'staff'`). A tela mostra "Cancelado pelo cliente" ou "Resolvido pelo cliente".
+  - **Escritas condicionais:** as regras são decididas sobre o chamado lido, e a gravação só vale se ele
+    ainda estiver igual (`unchangedSince` em `queries/ticket-writes.ts`). Resposta pública grava mensagem
+    e status num comando só (`WITH upd AS (UPDATE …) INSERT … FROM upd`), nota interna só entra em
+    chamado não encerrado, e a resposta do cliente segue o mesmo padrão. Se o chamado mudou no meio do
+    caminho (um cancelamento, por exemplo), a escrita relê uma vez e, se ainda não der, responde 409
+    `STALE` ("O chamado mudou agora há pouco").
   - Métrica "Resolvidos": chamados com `resolved_at` nos últimos 7 dias (equipe ou "Já resolvi");
     cancelado nunca tem `resolved_at`, então não conta. A primeira resposta pública num chamado aberto o coloca em atendimento e, sem
     responsável, atribui a quem respondeu. Nota interna não muda status nem a data de atualização.

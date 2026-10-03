@@ -46,6 +46,8 @@ const NOT_FOUND = { error: 'Chamado não encontrado.' }
 const CLOSED = {
   error: 'Este chamado está encerrado. Se o problema voltou, abra um novo chamado.',
 }
+/** O chamado mudou enquanto a resposta era gravada (a equipe alterou ao mesmo tempo). */
+const CONFLICT = { error: 'O chamado mudou agora há pouco. Recarregue e tente de novo.' }
 const NOT_CANCELLABLE = {
   error: 'Este chamado não pode mais ser cancelado: a equipe já começou o atendimento.',
   code: 'NOT_CANCELLABLE',
@@ -95,8 +97,10 @@ export function createTicketsRoute(store: ClientTicketStore, limits: ClientTicke
         }
         // `internal` é ignorado: nota interna é só da equipe.
         const result = await store.reply(c.get('user')!.id, code, parsed.data.content)
-        if (!result.ok)
-          return result.reason === 'closed' ? c.json(CLOSED, 409) : c.json(NOT_FOUND, 404)
+        if (!result.ok) {
+          if (result.reason === 'not_found') return c.json(NOT_FOUND, 404)
+          return c.json(result.reason === 'closed' ? CLOSED : CONFLICT, 409)
+        }
         return c.json({ status: result.status }, 201)
       })
       // "Já resolvi": fecha o chamado com o motivo `client_resolved`.

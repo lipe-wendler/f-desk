@@ -168,6 +168,35 @@ describe('/staff', () => {
     ).toBe(409)
   })
 
+  it('resposta e alteração num chamado que mudou no meio do caminho dão 409', async () => {
+    store.reply.mockResolvedValue({ ok: false, reason: 'conflict' })
+    const reply = await appAs(tech).request(
+      '/staff/tickets/TKT-0001/messages',
+      send('POST', { content: 'oi' }),
+    )
+    expect(reply.status).toBe(409)
+    expect(await reply.json()).toMatchObject({ code: 'STALE' })
+
+    store.reply.mockResolvedValue({ ok: false, reason: 'closed' })
+    const closed = await appAs(tech).request(
+      '/staff/tickets/TKT-0001/messages',
+      send('POST', { content: 'oi' }),
+    )
+    expect(closed.status).toBe(409)
+    expect(await closed.json()).toMatchObject({ code: 'CLOSED' })
+
+    store.update.mockResolvedValue({ ok: false, reason: 'STALE' })
+    const update = await appAs(tech).request(
+      '/staff/tickets/TKT-0001',
+      send('PATCH', { status: 'resolved' }),
+    )
+    expect(update.status).toBe(409)
+    expect(await update.json()).toEqual({
+      error: 'O chamado mudou agora há pouco. Recarregue e tente de novo.',
+      code: 'STALE',
+    })
+  })
+
   it('alteração: valida o corpo e traduz os erros das regras', async () => {
     expect((await appAs(tech).request('/staff/tickets/TKT-0001', send('PATCH', {}))).status).toBe(
       400,

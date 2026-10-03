@@ -8,6 +8,7 @@ import {
 import { and, asc, count, desc, eq, inArray, notInArray, sql, type SQL } from 'drizzle-orm'
 import { db } from '../client'
 import { conversation, conversationMessage, ticket, ticketMessage } from '../schema'
+import { unchangedSince, updateWithMessage, WRITE_ATTEMPTS } from './ticket-writes'
 
 export interface NewTicket {
   clientId: string
@@ -199,35 +200,39 @@ export async function getClientTicket(clientId: string, code: string) {
 }
 
 export type ClientReplyResult =
-  { ok: true; status: TicketStatus } | { ok: false; reason: 'not_found' | 'closed' }
+  { ok: true; status: TicketStatus } | { ok: false; reason: 'not_found' | 'closed' | 'conflict' }
 
 /**
  * Resposta do cliente. Se o chamado esperava por ele ou estava resolvido, volta para
  * "Em atendimento" (resolvido + resposta = o problema voltou). Fechado ou cancelado não aceita resposta.
+ * Mensagem e status são gravados juntos e só se o chamado não mudou desde a leitura
+ * (`updateWithMessage`); se mudou, relê uma vez.
  */
 export async function addClientReply(
   clientId: string,
   code: string,
   content: string,
 ): Promise<ClientReplyResult> {
-  const found = await findClientTicket(clientId, code)
-  if (!found) return { ok: false, reason: 'not_found' }
-  if (isTerminal(found.status)) return { ok: false, reason: 'closed' }
+  for (let attempt = 0; attempt < WRITE_ATTEMPTS; attempt++) {
+    const found = await findClientTicket(clientId, code)
+    if (!found) return { ok: false, reason: 'not_found' }
+    if (isTerminal(found.status)) return { ok: false, reason: 'closed' }
 
-  const reopen = found.status === 'waiting_client' || found.status === 'resolved'
-  const status: TicketStatus = reopen ? 'in_progress' : found.status
-  await db.batch([
-    db.insert(ticketMessage).values({ ticketId: found.id, authorId: clientId, content }),
-    db
+    const reopen = found.status === 'waiting_client' || found.status === 'resolved'
+    const status: TicketStatus = reopen ? 'in_progress' : found.status
+    const update = db
       .update(ticket)
       .set({
         status,
         updatedAt: new Date(),
         ...(found.status === 'resolved' ? { resolvedAt: null } : {}),
       })
-      .where(eq(ticket.id, found.id)),
-  ])
-  return { ok: true, status }
+      .where(unchangedSince(found))
+      .returning({ id: ticket.id })
+    if (await updateWithMessage(update, { authorId: clientId, content }))
+      return { ok: true, status }
+  }
+  return { ok: false, reason: 'conflict' }
 }
 
 const isTerminal = (status: TicketStatus) =>

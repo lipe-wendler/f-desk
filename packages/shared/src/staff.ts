@@ -38,6 +38,7 @@ export const STAFF_UPDATE_ERRORS = {
   CLIENT_ONLY: 'Só o cliente pode cancelar o chamado.',
   INVALID_TRANSITION: 'Essa mudança de status não é permitida.',
   INVALID_ASSIGNEE: 'Escolha um técnico ou admin ativo.',
+  STALE: 'O chamado mudou agora há pouco. Recarregue e tente de novo.',
 } as const
 export type StaffUpdateError = keyof typeof STAFF_UPDATE_ERRORS
 

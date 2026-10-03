@@ -175,6 +175,15 @@ describe('respostas e encerramento', () => {
     })
   })
 
+  it('chamado alterado pela equipe durante a resposta dá 409 para tentar de novo', async () => {
+    store.reply.mockResolvedValue({ ok: false, reason: 'conflict' })
+    const res = await appAs(client).request('/tickets/TKT-0001/messages', json({ content: 'oi' }))
+    expect(res.status).toBe(409)
+    expect(await res.json()).toEqual({
+      error: 'O chamado mudou agora há pouco. Recarregue e tente de novo.',
+    })
+  })
+
   it('encerra o chamado', async () => {
     store.close.mockResolvedValue({ ok: true })
     const res = await appAs(client).request('/tickets/TKT-0001/close', { method: 'POST' })
