@@ -109,6 +109,12 @@ O que já estava bom e continua valendo:
     própria.
 17. 🔧 **Sem ferramentas de cadeia de suprimentos.** Sem Dependabot, auditoria de dependências ou
     `SECURITY.md`; as Actions usam tag (`@v4`), não SHA.
+18. ✅ **Connection string no log do build** (achado da `/revisao-de-seguranca` no PR #19). A conferência de
+    migrations no build da Vercel (tarefa 17) chama o banco sem passar pelo `env.ts`. Com um
+    `DATABASE_URL` malformado (o trecho `psql '…'` copiado do console, por exemplo), o driver do Neon
+    repete a connection string na mensagem de erro, e ela iria para o build log, que todo o time da
+    Vercel vê. **Correção:** o script valida a URL sem ecoá-la e, em qualquer erro, loga só nome e
+    código (`safeErrorSummary`). Teste em `migrations-status.test.ts`.
 
 ## Checklist de infraestrutura
 

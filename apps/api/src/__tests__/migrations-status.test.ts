@@ -1,7 +1,9 @@
 import {
   checkMigrations,
+  isPostgresUrl,
   migrationStatus,
   readLocalMigrations,
+  safeErrorSummary,
   type AppliedMigration,
   type LocalMigration,
   type MigrationCheckEnv,
@@ -126,5 +128,35 @@ describe('checkMigrations', () => {
     })
     expect(result).toEqual({ ok: true, skipped: false })
     expect(lines[0]).toContain('Aviso: o banco tem 1 migration(s)')
+  })
+})
+
+describe('log do build sem a connection string', () => {
+  const SECRET = 'postgresql://usuario:SENHA-SECRETA@ep-x.neon.tech/db'
+
+  it('o resumo do erro tem só nome e código, procurando o código na cadeia de cause', () => {
+    // Como o drizzle entrega o erro do driver: a mensagem pode repetir a connection string.
+    const driver = Object.assign(new Error(`connection string: ${SECRET}`), { code: '42P01' })
+    const wrapped = new Error(`Failed query: ${SECRET}`, { cause: driver })
+    wrapped.name = 'DrizzleQueryError'
+    const summary = safeErrorSummary(wrapped)
+    expect(summary).toEqual({ name: 'DrizzleQueryError', code: '42P01' })
+    expect(JSON.stringify(summary)).not.toContain('SENHA-SECRETA')
+    expect(safeErrorSummary(new Error(SECRET))).toEqual({ name: 'Error' })
+    expect(safeErrorSummary(SECRET)).toEqual({ name: 'Erro' })
+    // Código que não tem cara de código não sai no log.
+    expect(safeErrorSummary(Object.assign(new Error('x'), { code: SECRET }))).toEqual({
+      name: 'Error',
+    })
+  })
+
+  it('só aceita DATABASE_URL que seja uma URL do Postgres', () => {
+    expect(isPostgresUrl(SECRET)).toBe(true)
+    expect(isPostgresUrl('postgres://u:p@host/db')).toBe(true)
+    expect(isPostgresUrl(undefined)).toBe(false)
+    expect(isPostgresUrl('')).toBe(false)
+    expect(isPostgresUrl(`psql '${SECRET}'`)).toBe(false)
+    expect(isPostgresUrl(`'${SECRET}'`)).toBe(false)
+    expect(isPostgresUrl('https://ep-x.neon.tech/sql')).toBe(false)
   })
 })

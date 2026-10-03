@@ -125,3 +125,29 @@ export async function checkMigrations(deps: MigrationCheckDeps): Promise<Migrati
   log(`Migrations em dia (${deps.local.length}).`)
   return { ok: true, skipped: false }
 }
+
+/**
+ * Resumo de um erro que pode ir para o log do build: só o nome e o código do Postgres, procurados na
+ * cadeia de `cause` (o drizzle embrulha o erro do driver). Nunca a mensagem, que pode trazer a
+ * connection string inteira (o driver do Neon a repete quando ela não é uma URL válida).
+ */
+export function safeErrorSummary(error: unknown): { name: string; code?: string } {
+  const name = error instanceof Error ? error.name : 'Erro'
+  for (let current: unknown = error, depth = 0; current && depth < 5; depth++) {
+    const code = (current as { code?: unknown }).code
+    if (typeof code === 'string' && /^[A-Z0-9_]{1,40}$/i.test(code)) return { name, code }
+    current = (current as { cause?: unknown }).cause
+  }
+  return { name }
+}
+
+/** `DATABASE_URL` com cara de URL do Postgres (sem ecoar o valor em nenhum caso). */
+export function isPostgresUrl(value: string | undefined): boolean {
+  if (!value) return false
+  try {
+    const url = new URL(value)
+    return (url.protocol === 'postgres:' || url.protocol === 'postgresql:') && Boolean(url.hostname)
+  } catch {
+    return false
+  }
+}
