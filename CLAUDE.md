@@ -9,6 +9,8 @@ Sistema de tickets da F.Wendler. Leia `README.md` e `docs/arquitetura.md` antes 
   `<tipo>/<descricao-da-tarefa-em-kebab-case>` (ex.: `feat/telas-de-login-e-cadastro`).
 - Commits em Conventional Commits com descrição em kebab-case: `feat(web): adiciona-tela-de-login`.
 - Ao terminar: PR para a `main` com título no mesmo padrão e o template preenchido. Merge só por squash.
+- Logo depois de abrir o PR, rode `/revisao-de-seguranca <número>` e publique o veredito no PR.
+  **Bloqueado** = corrigir na mesma branch antes do merge (o GitHub não impede: é regra do fluxo).
 - Detalhes em `docs/git-workflow.md`.
 
 ## Comandos

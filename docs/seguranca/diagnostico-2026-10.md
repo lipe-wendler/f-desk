@@ -111,7 +111,7 @@ Configurações fora do código. Marque aqui quando aplicar.
       (`openssl rand -base64 32` para cada). Assim um cookie de produção não vale num preview.
 - [x] **Vercel → Deployment Protection:** ligar _Vercel Authentication_ nos previews (só quem é do time
       abre um preview).
-- [ ] **Neon → previews:** a integração Neon ↔ Vercel sempre copia o branch padrão (`production`) e
+- [x] **Neon → previews:** a integração Neon ↔ Vercel sempre copia o branch padrão (`production`) e
       não tem opção de branch só com schema. Enquanto a base for pequena e só o time abrir PRs, o risco
       fica contido pelo segredo separado e pelo Deployment Protection; garantir _Automatically delete
       obsolete Neon branches_ ligado (Neon Console → Integrations → Vercel → Manage → Settings). Com
@@ -119,9 +119,16 @@ Configurações fora do código. Marque aqui quando aplicar.
       ou anonimizados, criados por PR.
 - [x] **Vercel → Production:** `BETTER_AUTH_URL` definido com o domínio final (sem ele, a baseURL cai na
       URL do deploy).
-- [ ] **GitHub → Settings → Branches:** proteger a `main` com os checks `checks`, `branch-name` e
-      `pr-title` (já descrito em `docs/git-workflow.md`).
-- [ ] **GitHub → Settings → Code security:** ligar Dependabot alerts e secret scanning.
+- [ ] **GitHub → Settings → Rules:** ruleset da `main` criado, mas **inativo**: o GitHub só aplica
+      rulesets e branch protection em repositório privado nos planos pagos. Sem isso, a `main` não
+      tem proteção no servidor: o hook `pre-push` só lembra (cai com `--no-verify`, e escrita pela API
+      do GitHub não passa por ele) e o veredito da `/revisao-de-seguranca` é um aviso. Para ativar:
+      GitHub Pro ou repositório público.
+- [x] **GitHub → Settings → Code security:** Dependabot alerts ligado. Secret scanning (Secret
+      Protection) fica **desligado** (pago em repositório privado); a busca de segredos no diff é
+      feita pela `/revisao-de-seguranca` (checklist, seção 6).
+- [x] **Claude Code:** o Claude não faz merge nem escreve na `main` (hook `proteger-main.mjs` e
+      regras `deny` em `.claude/settings.json`). Não substitui o ruleset: vale só para o Claude.
 
 ## Como verificar
 
