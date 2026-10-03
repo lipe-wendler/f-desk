@@ -16,6 +16,7 @@
     "format:check": "prettier --check .",
     "db:generate": "pnpm --filter @f-desk/db generate",
     "db:migrate": "pnpm --filter @f-desk/db migrate",
+    "db:check": "pnpm --filter @f-desk/db check",
     "prepare": "husky"
   },
   "devDependencies": {

@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "installCommand": "pnpm install --frozen-lockfile",
-  "buildCommand": "pnpm turbo run build --filter=web --filter=api",
+  "buildCommand": "pnpm --filter @f-desk/db migrations:check-deploy && pnpm turbo run build --filter=web --filter=api",
   "outputDirectory": "apps/web/dist",
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api" },
