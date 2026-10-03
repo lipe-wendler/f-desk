@@ -45,7 +45,7 @@ export function createConversationsRoute(
       })
       // "Resolveu" / "Não resolveu" depois de uma resposta pronta: vira mensagem da conversa e muda o status.
       // Os textos são os do atendimento guiado; o cliente só diz se resolveu.
-      .post('/:id/feedback', limitPerUser('conversation-write', limits.write), async (c) => {
+      .post('/:id/feedback', limitPerUser('client-write', limits.write), async (c) => {
         const id = z.uuid().safeParse(c.req.param('id'))
         if (!id.success) return c.json(NOT_FOUND, 404)
         const body = feedbackSchema.safeParse(await c.req.json().catch(() => null))
