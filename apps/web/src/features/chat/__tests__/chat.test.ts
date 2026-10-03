@@ -144,4 +144,111 @@ describe('store do chat', () => {
     other.hydrate('u2')
     expect(other.messages).toEqual([])
   })
+
+  describe('conversa do visitante levada para a conta', () => {
+    const IMPORTED = '55555555-5555-4555-8555-555555555555'
+    const json = (body: unknown, status = 200) =>
+      new Response(JSON.stringify(body), {
+        status,
+        headers: { 'content-type': 'application/json' },
+      })
+
+    /** Visitante conversa e entra: a conversa volta parcial, sem id. */
+    async function visitorThenLogin() {
+      mockFetch(
+        ndjson([{ type: 'start', source: 'faq' }, { type: 'delta', text: 'R' }, { type: 'end' }]),
+      )
+      const visitor = useChatStore()
+      visitor.hydrate(null)
+      await visitor.send('a impressora não imprime')
+      setActivePinia(createPinia())
+      const chat = useChatStore()
+      chat.hydrate('u1')
+      return chat
+    }
+
+    it('depois do login importa a conversa e passa a usar o id dela', async () => {
+      const chat = await visitorThenLogin()
+      expect(chat.partial).toBe(true)
+      const fetchMock = mockFetch(json({ conversationId: IMPORTED }, 201))
+
+      expect(await chat.importPartial()).toBe(true)
+      const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+      expect(url).toBe('/api/conversations/import')
+      expect(init.method).toBe('POST')
+      expect(JSON.parse(String(init.body))).toEqual({
+        transcript: [
+          { role: 'user', content: 'a impressora não imprime' },
+          { role: 'assistant', content: 'R' },
+        ],
+      })
+      expect(chat.conversationId).toBe(IMPORTED)
+      expect(chat.partial).toBe(false)
+      // O chamado passa a ir com a conversa gravada, sem reenviar a transcrição.
+      expect(chat.ticketAttachment).toEqual({ conversationId: IMPORTED, transcript: [] })
+      // Fica guardado: ao recarregar, a conversa segue com o id e não é importada de novo.
+      setActivePinia(createPinia())
+      const reloaded = useChatStore()
+      reloaded.hydrate('u1')
+      expect(reloaded.conversationId).toBe(IMPORTED)
+      expect(await reloaded.importPartial()).toBe(false)
+    })
+
+    it('se a importação falha, a conversa continua parcial (o chamado leva a transcrição)', async () => {
+      const chat = await visitorThenLogin()
+      mockFetch(json({ error: 'Muitas tentativas em pouco tempo.' }, 429))
+      expect(await chat.importPartial()).toBe(false)
+      expect(chat.partial).toBe(true)
+      expect(chat.conversationId).toBeUndefined()
+      expect(chat.ticketAttachment.transcript).toHaveLength(2)
+
+      // Na próxima carga, tenta de novo.
+      mockFetch(json({ conversationId: IMPORTED }, 201))
+      expect(await chat.importPartial()).toBe(true)
+      expect(chat.conversationId).toBe(IMPORTED)
+    })
+
+    it('mensagem enviada durante a importação vai para a conversa importada', async () => {
+      const chat = await visitorThenLogin()
+      let finish!: (r: Response) => void
+      const fetchMock = vi.fn()
+      fetchMock.mockReturnValueOnce(new Promise<Response>((resolve) => (finish = resolve)))
+      fetchMock.mockResolvedValueOnce(
+        ndjson([
+          { type: 'start', source: 'faq' },
+          { type: 'delta', text: 'R2' },
+          { type: 'end', conversationId: IMPORTED },
+        ]),
+      )
+      vi.stubGlobal('fetch', fetchMock)
+
+      const imported = chat.importPartial()
+      const sent = chat.send('e o scanner também')
+      finish(json({ conversationId: IMPORTED }, 201))
+      await Promise.all([imported, sent])
+      const body = JSON.parse(String((fetchMock.mock.calls[1] as [string, RequestInit])[1].body))
+      expect(body.conversationId).toBe(IMPORTED)
+      expect(chat.partial).toBe(false)
+    })
+
+    it('não importa sem conversa parcial nem depois de trocar de conversa', async () => {
+      const fetchMock = mockFetch()
+      const empty = useChatStore()
+      empty.hydrate('u1')
+      expect(await empty.importPartial()).toBe(false)
+      expect(fetchMock).not.toHaveBeenCalled()
+
+      const chat = await visitorThenLogin()
+      let finish!: (r: Response) => void
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(() => new Promise<Response>((resolve) => (finish = resolve))),
+      )
+      const imported = chat.importPartial()
+      chat.reset()
+      finish(json({ conversationId: IMPORTED }, 201))
+      expect(await imported).toBe(false)
+      expect(chat.conversationId).toBeUndefined()
+    })
+  })
 })

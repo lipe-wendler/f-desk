@@ -27,15 +27,19 @@ export function apiCsrf(trustedOrigins: readonly string[]) {
 
 /** Corpo maior que isso é recusado antes de ser lido (os limites dos campos vêm depois, no zod). */
 export const BODY_LIMIT = 512 * 1024
-/** Abrir chamado leva a transcrição do navegador junto (até 100 mensagens de 4000 caracteres). */
+/**
+ * Abrir chamado e importar a conversa do visitante levam a transcrição do navegador (até 100
+ * mensagens de 4000 caracteres).
+ */
 export const TICKET_BODY_LIMIT = 2 * 1024 * 1024
+const TRANSCRIPT_ROUTES = new Set(['/api/tickets', '/api/conversations/import'])
 
 const tooLarge = (c: Context) => c.json({ error: 'Conteúdo grande demais.' }, 413)
 
 export const apiBodyLimit = createMiddleware(async (c, next) => {
-  const isTicketCreation = c.req.method === 'POST' && c.req.path === '/api/tickets'
+  const carriesTranscript = c.req.method === 'POST' && TRANSCRIPT_ROUTES.has(c.req.path)
   return bodyLimit({
-    maxSize: isTicketCreation ? TICKET_BODY_LIMIT : BODY_LIMIT,
+    maxSize: carriesTranscript ? TICKET_BODY_LIMIT : BODY_LIMIT,
     onError: tooLarge,
   })(c, next)
 })

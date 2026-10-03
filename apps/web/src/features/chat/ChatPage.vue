@@ -74,9 +74,31 @@ const suggestions = QUICK_SUGGESTIONS.map((id) => FAQ.find((e) => e.id === id)!)
 
 watch(
   () => session.user?.id ?? null,
-  (userId) => chat.hydrate(userId),
+  async (userId) => {
+    chat.hydrate(userId)
+    // Visitante que entrou como cliente: a conversa de antes do login passa a ser da conta.
+    if (session.user?.role === 'client' && (await chat.importPartial())) await afterImported()
+  },
   { immediate: true },
 )
+
+/** Conversa importada no login: entra na sidebar e a URL passa a apontar para ela. */
+async function afterImported() {
+  if (!chat.conversationId) return
+  const said = chat.transcript
+  conversations.touch({
+    id: chat.conversationId,
+    firstQuestion: said.find((m) => m.role === 'user')?.content ?? '',
+    lastMessage: said.at(-1)?.content ?? '',
+    title: chat.meta?.title,
+    kind: chat.meta?.kind,
+    added: said.length,
+  })
+  // A lista começou a carregar antes da importação terminar: a resposta viria sem a conversa.
+  if (conversations.loading) void conversations.load()
+  if (routeId.value !== chat.conversationId)
+    await router.replace({ name: 'chat', params: { conversa: chat.conversationId } })
+}
 
 /** Rota e conversa aberta andam juntas: o id na URL abre a conversa; a conversa salva ganha URL. */
 watch(

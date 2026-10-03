@@ -9,6 +9,8 @@ import { authClient } from '../../lib/auth-client'
 import { homeFor } from '../../router/access'
 import { safeRedirect } from '../../router/redirect'
 import { useSessionStore } from '../../stores/session'
+import PendingTicketNotice from './PendingTicketNotice.vue'
+import { isPendingTicket, PENDING_TICKET_REASON } from './pending-ticket'
 import { authErrorMessage } from './auth-errors'
 
 const route = useRoute()
@@ -21,9 +23,16 @@ const formError = ref('')
 const submitting = ref(false)
 
 const redirect = computed(() => safeRedirect(route.query.redirect))
+/** Veio do cartão do chamado: a faixa avisa que falta pouco (e segue para a outra tela também). */
+const pendingTicket = computed(() => isPendingTicket(route.query, redirect.value))
 const signUpLink = computed(() => ({
   name: 'sign-up',
-  query: redirect.value ? { redirect: redirect.value } : {},
+  query: redirect.value
+    ? {
+        redirect: redirect.value,
+        ...(pendingTicket.value ? { motivo: PENDING_TICKET_REASON } : {}),
+      }
+    : {},
 }))
 
 async function submit() {
@@ -66,6 +75,8 @@ async function submit() {
         }}
       </p>
     </header>
+
+    <PendingTicketNotice v-if="pendingTicket" />
 
     <form class="flex flex-col gap-4" novalidate @submit.prevent="submit">
       <FormAlert v-if="formError">{{ formError }}</FormAlert>

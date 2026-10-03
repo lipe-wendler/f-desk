@@ -16,10 +16,12 @@ const store = {
   reply: vi.fn(),
   close: vi.fn(),
 } satisfies Record<keyof ClientTicketStore, ReturnType<typeof vi.fn>>
-const conversations = { list: vi.fn(), get: vi.fn(), feedback: vi.fn() } satisfies Record<
-  keyof ConversationStore,
-  ReturnType<typeof vi.fn>
->
+const conversations = {
+  list: vi.fn(),
+  get: vi.fn(),
+  feedback: vi.fn(),
+  import: vi.fn(),
+} satisfies Record<keyof ConversationStore, ReturnType<typeof vi.fn>>
 
 function appAs(user: User | null) {
   return new Hono<AppEnv>()

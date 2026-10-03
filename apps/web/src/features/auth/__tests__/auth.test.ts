@@ -29,6 +29,7 @@ async function mountAt(component: object, path: string) {
     history: createMemoryHistory(),
     routes: [
       { path: '/', name: 'chat', component: stub },
+      { path: '/atendimento', component: stub },
       { path: '/entrar', name: 'sign-in', component: stub },
       { path: '/criar-conta', name: 'sign-up', component: stub },
       { path: '/tecnico', name: 'staff-dashboard', component: stub },
@@ -187,6 +188,50 @@ describe('SignUpPage', () => {
     const alert = wrapper.find('[role="alert"]')
     expect(alert.text()).toContain('Já existe uma conta com esse e-mail.')
     expect(alert.find('a').attributes('href')).toBe('/entrar?redirect=/chamados/TKT-0001')
+  })
+})
+
+describe('vindo do cartão do chamado', () => {
+  const FROM_CARD = '?redirect=/atendimento&motivo=chamado'
+
+  it('cadastro e login mostram a faixa e levam o motivo de uma tela para a outra', async () => {
+    for (const [page, path, other] of [
+      [SignUpPage, `/criar-conta${FROM_CARD}`, `/entrar${FROM_CARD}`],
+      [SignInPage, `/entrar${FROM_CARD}`, `/criar-conta${FROM_CARD}`],
+    ] as const) {
+      const { wrapper } = await mountAt(page, path)
+      expect(wrapper.get('[data-testid="pending-ticket"]').text()).toContain(
+        'Falta pouco para abrir seu chamado',
+      )
+      const links = wrapper.findAll('a').map((a) => a.attributes('href'))
+      expect(links).toContain(other)
+    }
+  })
+
+  it('sem o motivo (ou com outro destino), não há faixa', async () => {
+    for (const [page, path] of [
+      [SignUpPage, '/criar-conta?redirect=/atendimento'],
+      [SignInPage, '/entrar?redirect=/atendimento'],
+      [SignInPage, '/entrar?redirect=/chamados&motivo=chamado'],
+      [SignUpPage, '/criar-conta'],
+    ] as const) {
+      const { wrapper } = await mountAt(page, path)
+      expect(wrapper.find('[data-testid="pending-ticket"]').exists()).toBe(false)
+    }
+  })
+
+  it('depois do cadastro volta para o atendimento', async () => {
+    auth.signUp.mockResolvedValue({ data: {}, error: null })
+    auth.getSession.mockResolvedValue(sessionOf('client'))
+    const { wrapper, router } = await mountAt(SignUpPage, `/criar-conta${FROM_CARD}`)
+    const inputs = wrapper.findAll('input')
+    await inputs[0]!.setValue('Ana Souza')
+    await inputs[1]!.setValue('ana@exemplo.com')
+    await inputs[2]!.setValue('segredo123')
+    await inputs[3]!.setValue('segredo123')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+    expect(router.currentRoute.value.fullPath).toBe('/atendimento')
   })
 })
 

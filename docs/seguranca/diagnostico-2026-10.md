@@ -19,7 +19,7 @@ Status de cada achado:
 | `GET /api/admin/users`                    | `admin`                                   | todos (por definição)                                                  |
 | `GET /api/chat/status` · `POST /api/chat` | pública, com cota                         | conversa gravada só para o dono (`saveChatExchange` confere `user_id`) |
 | `/api/tickets/*`                          | `client`                                  | `client_id` da sessão em toda query; de outra pessoa é 404             |
-| `/api/conversations/*`                    | `client`                                  | `user_id` da sessão em toda query                                      |
+| `/api/conversations/*`                    | `client`                                  | `user_id` da sessão em toda query (inclusive na importação)            |
 | `/api/staff/*`                            | `technician` e `admin`                    | todos os chamados (a equipe atende a fila inteira)                     |
 
 O que já estava bom e continua valendo:
@@ -62,9 +62,16 @@ O que já estava bom e continua valendo:
    marca (não há como distingui-las com segurança).
 5. ✅ **Histórico do chat editável pelo navegador.** O contexto do LLM vinha do `history` do corpo,
    inclusive com falas `assistant`. **Correção:** com usuário logado e `conversationId`, o contexto vem
-   do banco (`getConversationHistory`), ou fica vazio se a conversa não for dele. O `history` do corpo
-   só vale sem conversa gravada: visitante (afeta só ele) e quem entrou no meio da conversa (a tarefa
-   16 passa a importar essa conversa no login, e então o corpo deixa de valer para logados).
+   do banco (`getConversationHistory`), ou fica vazio se a conversa não for dele. Na tarefa 16, o
+   contexto de quem está logado passou a vir **só** do banco: sem `conversationId`, fica vazio. O
+   `history` do corpo só vale para o visitante (afeta só a conversa dele). Quem entrou no meio da
+   conversa tem o começo importado no login (`POST /api/conversations/import`: dono da sessão,
+   mensagens `imported`, cota `client-write` e mais uma de 5 por hora, `conversation-import`,
+   apontada pela revisão do PR #18: a rota grava o mesmo volume que abrir chamado). Testes em `chat-route.test.ts` (logado sem conversa
+   gravada) e `conversation-import.test.ts`. A conversa importada continua sendo texto do navegador e
+   entra no contexto da própria conversa: quem forja falas da Wen ali engana só o próprio
+   atendimento (a Wen não age sem confirmação pela rota REST, com o id da sessão), e a equipe vê o
+   trecho marcado como não verificado.
 6. ✅ **Escritas sem limite.** Abrir chamado, responder e as ações da equipe não tinham cota: dava para
    encher a fila da equipe. **Correção:** `limitPerUser` (`services/rate-limit.ts`) com contadores na
    mesma tabela do chat, por bucket: 5 chamados/hora, 30 escritas do cliente e 120 da equipe a cada

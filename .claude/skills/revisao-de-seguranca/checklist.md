@@ -43,7 +43,8 @@ vem de um achado real ou de uma garantia que o projeto já tem e não pode perde
 - [ ] Ferramenta de leitura devolve só dados do próprio cliente, sem notas internas e sem dados de
       outras pessoas (nome de técnico pode; e-mail não).
 - [ ] Conteúdo de chamado e conversa vai para o modelo como dado, e o prompt diz que não é instrução.
-- [ ] Contexto do LLM com conversa gravada vem do banco, não do `history` do navegador.
+- [ ] Contexto do LLM de quem está logado vem só do banco; o `history` do navegador só vale para o
+      visitante.
 - [ ] Texto vindo do navegador (transcrição) é marcado como `imported` e não aparece para a equipe
       como fala da Wen.
 

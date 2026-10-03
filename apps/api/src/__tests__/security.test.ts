@@ -124,10 +124,12 @@ const ticketStore = {
   reply: vi.fn(),
   close: vi.fn(),
 } satisfies Record<keyof ClientTicketStore, ReturnType<typeof vi.fn>>
-const conversationStore = { list: vi.fn(), get: vi.fn(), feedback: vi.fn() } satisfies Record<
-  keyof ConversationStore,
-  ReturnType<typeof vi.fn>
->
+const conversationStore = {
+  list: vi.fn(),
+  get: vi.fn(),
+  feedback: vi.fn(),
+  import: vi.fn(),
+} satisfies Record<keyof ConversationStore, ReturnType<typeof vi.fn>>
 const staffStore = {
   list: vi.fn(),
   metrics: vi.fn(),
@@ -206,11 +208,17 @@ describe('dados de outro cliente', () => {
     expect((await app.request(`/conversations/${id}`)).status).toBe(404)
     await app.request(`/conversations/${id}/feedback`, json({ resolved: true, userId: 'cB' }))
     await app.request('/conversations?userId=cB')
+    await app.request(
+      '/conversations/import',
+      json({ transcript: [{ role: 'user', content: 'oi' }], userId: 'cB' }),
+    )
 
     expect(conversationStore.get).toHaveBeenCalledWith('cA', id)
+    expect(conversationStore.import).toHaveBeenCalledWith(expect.objectContaining({ userId: 'cA' }))
     for (const call of [
       ...conversationStore.feedback.mock.calls,
       ...conversationStore.list.mock.calls,
+      ...conversationStore.import.mock.calls,
     ])
       expect(JSON.stringify(call)).not.toContain('cB')
   })

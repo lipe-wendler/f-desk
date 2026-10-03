@@ -10,6 +10,7 @@ import {
   getConversationHistory,
   getStaffMetrics,
   getStaffTicket,
+  importConversation,
   listAssignees,
   listClientTickets,
   listConversations,
@@ -97,8 +98,13 @@ app.route(
       list: listConversations,
       get: getConversation,
       feedback: saveConversationFeedback,
+      import: importConversation,
     },
-    { write: createQuota(env.TICKET_WRITE_LIMIT, 600, consumeChatQuota) },
+    {
+      write: createQuota(env.TICKET_WRITE_LIMIT, 600, consumeChatQuota),
+      // Mesmo volume que abrir chamado (transcrição de até 100 mensagens): a mesma cota por hora.
+      import: createQuota(env.TICKET_CREATE_LIMIT, 3600, consumeChatQuota),
+    },
   ),
 )
 

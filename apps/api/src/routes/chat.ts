@@ -38,8 +38,8 @@ export interface ChatDeps {
   /** Título e tipo da conversa nova pelo LLM (padrão: `describeConversation`). Injetável nos testes. */
   describe?: typeof describeConversation
   /**
-   * Histórico gravado de uma conversa do usuário (`null` se não for dele). Com conversa gravada, o
-   * contexto do LLM vem daqui, e não do `history` do corpo, que o navegador pode forjar.
+   * Histórico gravado de uma conversa do usuário (`null` se não for dele). Para quem está logado, o
+   * contexto do LLM vem só daqui, nunca do `history` do corpo, que o navegador pode forjar.
    */
   loadHistory?: (userId: string, conversationId: string) => Promise<ChatMessage[] | null>
 }
@@ -74,12 +74,14 @@ export function createChatRoute(deps: ChatDeps) {
           )
         }
 
-        // Logado com conversa: o contexto é o gravado (ou nenhum, se a conversa não for dele; o
-        // `saveExchange` abre uma nova). O `history` do corpo só vale sem conversa gravada: visitante
-        // ou quem entrou no meio da conversa e ainda não tem nada gravado.
-        const usesSaved = Boolean(user && conversationId && deps.loadHistory)
-        const history = usesSaved
-          ? ((await deps.loadHistory!(user!.id, conversationId!)) ?? [])
+        // Logado: o contexto vem só do banco. Com conversa, o histórico gravado (ou nenhum, se a
+        // conversa não for dele; o `saveExchange` abre uma nova); sem conversa, nenhum. O `history`
+        // do corpo, que o navegador pode forjar, só vale para o visitante (afeta só a conversa dele).
+        // Quem entrou no meio da conversa tem o começo importado no login (`/conversations/import`).
+        const history = user
+          ? conversationId && deps.loadHistory
+            ? ((await deps.loadHistory(user.id, conversationId)) ?? [])
+            : []
           : parsed.data.history
 
         // Opção do atendimento guiado: a resposta pronta escolhida, sem depender da busca por palavras.
