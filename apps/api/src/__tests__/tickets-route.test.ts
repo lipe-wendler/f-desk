@@ -141,7 +141,9 @@ describe('respostas e encerramento', () => {
     )
     expect(res.status).toBe(201)
     expect(await res.json()).toEqual({ status: 'in_progress' })
-    expect(store.reply).toHaveBeenCalledWith('c1', 'TKT-0001', 'Ainda não funciona')
+    expect(store.reply).toHaveBeenCalledWith('c1', 'TKT-0001', 'Ainda não funciona', {
+      reopen: true,
+    })
   })
 
   it('chamado fechado recusa resposta e novo encerramento', async () => {
@@ -182,6 +184,36 @@ describe('respostas e encerramento', () => {
     expect(await res.json()).toEqual({
       error: 'O chamado mudou agora há pouco. Recarregue e tente de novo.',
     })
+  })
+
+  it('informação da Wen (`reopen: false`) não reabre chamado resolvido: 409 RESOLVED', async () => {
+    store.reply.mockResolvedValue({ ok: false, reason: 'resolved' })
+    const res = await appAs(client).request(
+      '/tickets/TKT-0001/messages',
+      json({ content: 'O modelo é HP LaserJet 400.', reopen: false }),
+    )
+    expect(res.status).toBe(409)
+    expect(await res.json()).toEqual({
+      error: 'Este chamado já foi resolvido. Se o problema voltou, abra um novo chamado.',
+      code: 'RESOLVED',
+    })
+    expect(store.reply).toHaveBeenCalledWith('c1', 'TKT-0001', 'O modelo é HP LaserJet 400.', {
+      reopen: false,
+    })
+  })
+
+  it('a resposta pela tela continua reabrindo (reopen padrão)', async () => {
+    store.reply.mockResolvedValue({ ok: true, status: 'in_progress' })
+    await appAs(client).request('/tickets/TKT-0001/messages', json({ content: 'voltou' }))
+    expect(store.reply).toHaveBeenCalledWith('c1', 'TKT-0001', 'voltou', { reopen: true })
+    expect(
+      (
+        await appAs(client).request(
+          '/tickets/TKT-0001/messages',
+          json({ content: 'x', reopen: 'nao' }),
+        )
+      ).status,
+    ).toBe(400)
   })
 
   it('encerra o chamado', async () => {

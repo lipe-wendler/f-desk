@@ -8,4 +8,8 @@ vários provedores. As chaves só existem no servidor.
   novo, instale o pacote `@ai-sdk/<provedor>` e acrescente uma linha em `LLM_PROVIDERS` e em `factories`.
 - `prompt.ts`: instruções fixas da Wen com a base de FAQ como referência. Não coloque nada que mude a cada
   pedido (data, nome do usuário) para o prefixo continuar em cache nos provedores.
-- `reply.ts`: streaming da resposta (`streamText`), com as últimas 12 mensagens como contexto.
+- `reply.ts`: streaming da resposta (`streamText`), com as últimas 12 mensagens como contexto e até 3
+  passos do modelo por mensagem.
+- `ticket-tools.ts`: ferramentas da Wen para o cliente logado (consultar os próprios chamados e propor
+  ações), montadas por requisição com o id da sessão. As ações não mudam nada: o cliente confirma no
+  cartão, pela rota de chamados. Regras em `docs/arquitetura.md` (chat).

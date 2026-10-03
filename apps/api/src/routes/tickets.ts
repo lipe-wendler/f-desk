@@ -8,9 +8,9 @@ import type {
 } from '@f-desk/db'
 import {
   TICKET_CODE_PATTERN,
+  clientReplySchema,
   createTicketSchema,
   fieldErrors,
-  ticketMessageSchema,
 } from '@f-desk/shared'
 import { Hono } from 'hono'
 import { z } from 'zod'
@@ -45,6 +45,11 @@ const listQuerySchema = z.object({
 const NOT_FOUND = { error: 'Chamado não encontrado.' }
 const CLOSED = {
   error: 'Este chamado está encerrado. Se o problema voltou, abra um novo chamado.',
+}
+/** Informação adicionada pela Wen (`reopen: false`) não reabre chamado resolvido. */
+const RESOLVED = {
+  error: 'Este chamado já foi resolvido. Se o problema voltou, abra um novo chamado.',
+  code: 'RESOLVED',
 }
 /** O chamado mudou enquanto a resposta era gravada (a equipe alterou ao mesmo tempo). */
 const CONFLICT = { error: 'O chamado mudou agora há pouco. Recarregue e tente de novo.' }
@@ -91,15 +96,17 @@ export function createTicketsRoute(store: ClientTicketStore, limits: ClientTicke
       .post('/:code/messages', limitPerUser('client-write', limits.write), async (c) => {
         const code = c.req.param('code')
         if (!TICKET_CODE_PATTERN.test(code)) return c.json(NOT_FOUND, 404)
-        const parsed = ticketMessageSchema.safeParse(await c.req.json().catch(() => null))
+        const parsed = clientReplySchema.safeParse(await c.req.json().catch(() => null))
         if (!parsed.success) {
           return c.json({ error: 'Confira a mensagem.', fields: fieldErrors(parsed.error) }, 400)
         }
-        // `internal` é ignorado: nota interna é só da equipe.
-        const result = await store.reply(c.get('user')!.id, code, parsed.data.content)
+        // `internal` é ignorado: nota interna é só da equipe. `reopen: false` vem do cartão da Wen.
+        const { content, reopen } = parsed.data
+        const result = await store.reply(c.get('user')!.id, code, content, { reopen })
         if (!result.ok) {
           if (result.reason === 'not_found') return c.json(NOT_FOUND, 404)
-          return c.json(result.reason === 'closed' ? CLOSED : CONFLICT, 409)
+          const error = { closed: CLOSED, resolved: RESOLVED, conflict: CONFLICT }[result.reason]
+          return c.json(error, 409)
         }
         return c.json({ status: result.status }, 201)
       })
