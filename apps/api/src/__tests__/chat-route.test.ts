@@ -1,5 +1,6 @@
 import type { ChatExchange } from '@f-desk/db'
 import {
+  CHAT_ACTION_REPLY,
   CHAT_ERROR_REPLY,
   CHAT_FALLBACK_REPLY,
   CHAT_PROPOSAL_REPLY,
@@ -822,6 +823,39 @@ describe('Wen com os chamados do cliente', () => {
     })
     await send(app, { message: 'lista tudo de novo e de novo' })
     expect(calls).toHaveLength(3)
+  })
+
+  it('conta desativada não recebe as ferramentas de chamados', async () => {
+    const { model, calls } = streamingModel(['ok'])
+    const banned = { ...client, banned: true, banExpires: null } as Partial<User>
+    const { app } = setup({
+      model,
+      user: banned,
+      tickets: store(ticketStore()),
+      describe: async () => null,
+    })
+    await send(app, { message: 'o sistema de notas fiscais mostra erro 503' })
+    expect((calls[0] as { tools?: { name: string }[] }).tools?.map((t) => t.name)).toEqual([
+      'proporChamado',
+    ])
+  })
+
+  it('se o modelo só propõe a ação, a Wen ainda fala com o cliente (e a troca é gravada)', async () => {
+    const { model } = scriptedModel([
+      { calls: [{ toolName: 'proporResolucao', input: { codigo: 'TKT-0042' } }] },
+      { calls: [{ toolName: 'listarMeusChamados', input: {} }] },
+      { calls: [{ toolName: 'listarMeusChamados', input: {} }] },
+    ])
+    const { app, saved } = setup({
+      model,
+      user: client,
+      tickets: store(ticketStore()),
+      describe: async () => null,
+    })
+    const { events } = await send(app, { message: 'já resolveu o TKT-0042' })
+    expect(text(events)).toBe(CHAT_ACTION_REPLY)
+    expect(events.at(-2)).toMatchObject({ type: 'ticket-action-proposal', action: 'resolve' })
+    expect(saved[0]?.reply.content).toBe(CHAT_ACTION_REPLY)
   })
 
   it('falha no banco não chega ao modelo com detalhes internos', async () => {

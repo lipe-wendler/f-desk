@@ -73,6 +73,10 @@ export const CHAT_TICKET_DETAILS_REPLY =
 export const CHAT_PROPOSAL_REPLY =
   'Não consegui resolver por aqui. Preparei um chamado para a equipe técnica: confira os dados abaixo e confirme.'
 
+/** Texto da resposta quando o LLM só propõe uma ação num chamado, sem escrever nada antes. */
+export const CHAT_ACTION_REPLY =
+  'Preparei a ação no seu chamado. Nada foi feito ainda: confira e confirme no cartão abaixo.'
+
 /** Fala do Wen gravada na conversa quando o chamado é aberto pela proposta. */
 export const ticketCreatedReply = (code: string) =>
   `Abri o chamado ${code}. Um técnico vai assumir o caso, e você acompanha as respostas em Meus chamados.`

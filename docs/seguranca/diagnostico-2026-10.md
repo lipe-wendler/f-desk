@@ -121,6 +121,11 @@ O que já estava bom e continua valendo:
     repete a connection string na mensagem de erro, e ela iria para o build log, que todo o time da
     Vercel vê. **Correção:** o script valida a URL sem ecoá-la e, em qualquer erro, loga só nome e
     código (`safeErrorSummary`). Teste em `migrations-status.test.ts`.
+19. ⚠️ **Mensagem da Wen com até 3 chamadas ao provedor** (tarefa 19). Com as ferramentas de chamados,
+    uma mensagem de cliente logado pode custar até 3 passos do modelo (`MAX_STEPS` em
+    `services/llm/reply.ts`), mas conta uma vez só na cota do chat (20 a cada 10 minutos). É
+    intencional: o teto limita o custo de cada mensagem, e visitante e equipe continuam com um passo
+    só. Rever se o custo do provedor pesar.
 
 ## Checklist de infraestrutura
 

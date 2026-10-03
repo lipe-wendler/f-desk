@@ -1,5 +1,6 @@
 import type { ChatExchange } from '@f-desk/db'
 import {
+  CHAT_ACTION_REPLY,
   CHAT_ERROR_REPLY,
   CHAT_FALLBACK_REPLY,
   CHAT_PROPOSAL_REPLY,
@@ -19,6 +20,7 @@ import {
 } from '@f-desk/shared'
 import type { LanguageModel } from 'ai'
 import { Hono } from 'hono'
+import { isBanned } from '../middleware/require-role'
 import type { AppEnv } from '../middleware/session'
 import { isTicketRequest } from '../services/faq/intent'
 import { matchFaq } from '../services/faq/match'
@@ -115,11 +117,10 @@ export function createChatRoute(deps: ChatDeps) {
             let action: TicketActionProposal | undefined
             try {
               if (source === 'llm' && deps.model) {
-                const audience: WenAudience = !user
-                  ? 'visitor'
-                  : user.role === 'client'
-                    ? 'client'
-                    : 'staff'
+                // Conta desativada fica como visitante: as ferramentas de chamados ficam do lado de
+                // fora do `requireRole`, então a mesma regra de desativação vale aqui.
+                const audience: WenAudience =
+                  !user || isBanned(user) ? 'visitor' : user.role === 'client' ? 'client' : 'staff'
                 for await (const part of streamWenReply(deps.model, history, message, {
                   audience,
                   ticketRequested,
@@ -141,8 +142,8 @@ export function createChatRoute(deps: ChatDeps) {
                   send({ type: 'delta', text: part.text })
                 }
                 // O modelo só chamou a ferramenta: a conversa ainda precisa de uma fala do Wen.
-                if (proposal && !reply.trim()) {
-                  reply = CHAT_PROPOSAL_REPLY
+                if ((proposal || action) && !reply.trim()) {
+                  reply = proposal ? CHAT_PROPOSAL_REPLY : CHAT_ACTION_REPLY
                   send({ type: 'delta', text: reply })
                 }
               } else if (faq) {
