@@ -26,10 +26,11 @@ export const ticketsApi = {
       method: 'POST',
       body: JSON.stringify(input),
     }),
-  reply: (code: string, content: string) =>
+  /** `reopen: false` (informação adicionada pela Wen): chamado resolvido recusa em vez de reabrir. */
+  reply: (code: string, content: string, options: { reopen?: boolean } = {}) =>
     apiFetch<{ status: TicketStatus }>(`/tickets/${encodeURIComponent(code)}/messages`, {
       method: 'POST',
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({ content, ...options }),
     }),
   /** "Já resolvi": fecha o chamado. */
   close: (code: string) =>
