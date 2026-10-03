@@ -54,7 +54,7 @@ A vitrine do design system fica em `http://localhost:5173/design-system` (só em
 | `pnpm dev`                                                  | Sobe web e API               |
 | `pnpm lint` · `pnpm typecheck` · `pnpm test` · `pnpm build` | Checagens (as mesmas do CI)  |
 | `pnpm format`                                               | Prettier no repositório      |
-| `pnpm db:generate` · `pnpm db:migrate`                      | Migrations do Drizzle        |
+| `pnpm db:generate` · `pnpm db:migrate` · `pnpm db:check`    | Migrations do Drizzle        |
 | `neon config plan` · `neon deploy`                          | Política do Neon (`neon.ts`) |
 
 ## Documentação

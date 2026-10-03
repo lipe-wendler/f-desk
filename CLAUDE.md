@@ -34,3 +34,5 @@ Sistema de tickets da F.Wendler. Leia `README.md` e `docs/arquitetura.md` antes 
 - No ambiente cloud, o CLI autentica por `NEON_API_KEY`; `neon link` gera `.env.local` (fora do git).
 - A porta 5432 pode estar bloqueada: use o driver HTTP (`pnpm db:migrate` já usa) em vez de `psql`.
 - Teste migrations num branch do Neon antes do `production`; nunca rode dados de teste no `production`.
+- O build da Vercel confere as migrations e falha se o banco do deploy não tiver alguma (nunca aplica):
+  fluxo em `docs/deploy.md`. `pnpm db:check` confere o banco do `.env.local`.

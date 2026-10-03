@@ -126,6 +126,10 @@ Navegador ──► Vercel (mesmo domínio)
 Schema em `packages/db/src/schema`; status, prioridades e papéis das mensagens vêm de
 `packages/shared/src/tickets.ts`, e os checks do banco usam as mesmas listas.
 
+Migrations em `packages/db/drizzle`, aplicadas à mão em cada branch do Neon (`pnpm db:migrate`). O
+build da Vercel nunca aplica, só confere: se o banco do deploy não tem alguma migration do código, o build
+falha (em produção, a versão anterior continua no ar). Fluxo em [deploy.md](deploy.md#a-cada-mudança-no-banco-migrations).
+
 - **Auth** (`auth.ts`, gerado pelo better-auth): `user` (com `role`, `banned`…), `session`, `account`,
   `verification`, `rate_limit`.
 - **Limite do chat** (`chat.ts`): `chat_rate_limit` (key, window_start, count), janela fixa por chave.
@@ -178,5 +182,6 @@ Schema em `packages/db/src/schema`; status, prioridades e papéis das mensagens 
 14. ~~`fix/diagnostico-e-correcoes-de-seguranca`~~ — concluída ([diagnóstico](seguranca/diagnostico-2026-10.md))
 15. ~~`chore/revisao-de-seguranca-com-claude`~~ — concluída
 16. ~~`feat/criar-conta-pelo-cartao-de-chamado`~~ — concluída
-17. `feat/cancelar-e-resolver-chamado-pelo-cliente`
-18. `feat/wen-consulta-e-acoes-em-chamados`
+17. ~~`chore/conferir-migrations-pendentes-no-deploy`~~ — concluída ([fluxo de migrations](deploy.md#a-cada-mudança-no-banco-migrations))
+18. `feat/cancelar-e-resolver-chamado-pelo-cliente`
+19. `feat/wen-consulta-e-acoes-em-chamados`
