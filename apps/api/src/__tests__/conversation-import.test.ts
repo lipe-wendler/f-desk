@@ -19,7 +19,7 @@ const transcript = [
 
 const store = { list: vi.fn(), get: vi.fn(), feedback: vi.fn(), import: vi.fn() }
 
-function appAs(user: User | null, write?: ConsumeQuota) {
+function appAs(user: User | null, write?: ConsumeQuota, importQuota?: ConsumeQuota) {
   return new Hono<AppEnv>()
     .use('*', async (c, next) => {
       c.set('user', user)
@@ -28,7 +28,10 @@ function appAs(user: User | null, write?: ConsumeQuota) {
     })
     .route(
       '/conversations',
-      createConversationsRoute(store as unknown as ConversationStore, { write }),
+      createConversationsRoute(store as unknown as ConversationStore, {
+        write,
+        import: importQuota,
+      }),
     )
 }
 
@@ -97,6 +100,26 @@ describe('POST /conversations/import', () => {
     expect(res.status).toBe(429)
     expect(res.headers.get('retry-after')).toBe('60')
     expect(keys).toEqual(['client-write:user:cA'])
+    expect(store.import).not.toHaveBeenCalled()
+  })
+
+  it('tem cota própria, mais curta que a de escrita (grava até 100 mensagens por vez)', async () => {
+    const keys: string[] = []
+    const allowed: ConsumeQuota = async (key) => {
+      keys.push(key)
+      return { allowed: true, retryAfter: 1 }
+    }
+    const blocked: ConsumeQuota = async (key) => {
+      keys.push(key)
+      return { allowed: false, retryAfter: 3600 }
+    }
+    const res = await appAs(clientA, allowed, blocked).request(
+      '/conversations/import',
+      post({ transcript }),
+    )
+    expect(res.status).toBe(429)
+    expect(res.headers.get('retry-after')).toBe('3600')
+    expect(keys).toEqual(['client-write:user:cA', 'conversation-import:user:cA'])
     expect(store.import).not.toHaveBeenCalled()
   })
 

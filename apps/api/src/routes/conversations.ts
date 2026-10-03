@@ -32,7 +32,11 @@ const NOT_FOUND = { error: 'Conversa não encontrada.' }
 /** Histórico das conversas do cliente com a Wen (gravadas pelo chat quando ele está logado). */
 export function createConversationsRoute(
   store: ConversationStore,
-  limits: { write?: ConsumeQuota } = {},
+  limits: {
+    write?: ConsumeQuota
+    /** Importações por janela: cada uma grava até 100 mensagens (uso normal é uma por login). */
+    import?: ConsumeQuota
+  } = {},
 ) {
   return (
     new Hono<AppEnv>()
@@ -51,17 +55,22 @@ export function createConversationsRoute(
       })
       // Conversa do visitante que entrou na conta (pelo cartão do chamado, por exemplo): vira uma
       // conversa dele, com o dono da sessão e as mensagens marcadas como importadas.
-      .post('/import', limitPerUser('client-write', limits.write), async (c) => {
-        const parsed = importConversationSchema.safeParse(await c.req.json().catch(() => null))
-        if (!parsed.success) {
-          return c.json({ error: 'Conversa inválida.', fields: fieldErrors(parsed.error) }, 400)
-        }
-        const conversationId = await store.import({
-          userId: c.get('user')!.id,
-          transcript: parsed.data.transcript,
-        })
-        return c.json({ conversationId }, 201)
-      })
+      .post(
+        '/import',
+        limitPerUser('client-write', limits.write),
+        limitPerUser('conversation-import', limits.import),
+        async (c) => {
+          const parsed = importConversationSchema.safeParse(await c.req.json().catch(() => null))
+          if (!parsed.success) {
+            return c.json({ error: 'Conversa inválida.', fields: fieldErrors(parsed.error) }, 400)
+          }
+          const conversationId = await store.import({
+            userId: c.get('user')!.id,
+            transcript: parsed.data.transcript,
+          })
+          return c.json({ conversationId }, 201)
+        },
+      )
       // "Resolveu" / "Não resolveu" depois de uma resposta pronta: vira mensagem da conversa e muda o status.
       // Os textos são os do atendimento guiado; o cliente só diz se resolveu.
       .post('/:id/feedback', limitPerUser('client-write', limits.write), async (c) => {

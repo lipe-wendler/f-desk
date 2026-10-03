@@ -105,7 +105,8 @@ Navegador ──► Vercel (mesmo domínio)
   uma delas.
   - `POST /import` recebe a transcrição do navegador (o mesmo schema da transcrição do chamado, de 1 a
     100 mensagens) e cria a conversa com o `user_id` da sessão e as mensagens marcadas como `imported`,
-    num `batch`. Conta na cota `client-write` e aceita corpo de até 2 MB, como abrir chamado.
+    num `batch`. Conta na cota `client-write` e tem uma própria, `conversation-import`, com o mesmo
+    limite de abrir chamado (5 por hora), porque grava o mesmo volume; aceita corpo de até 2 MB.
 
 - **Dashboard da equipe** (`/api/staff`, só `technician` e `admin`):
   - `GET /metrics` (cards), `GET /assignees` (técnicos e admins ativos), `GET /tickets` (filas `active`,

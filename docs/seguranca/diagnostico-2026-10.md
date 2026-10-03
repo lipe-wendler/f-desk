@@ -66,7 +66,8 @@ O que já estava bom e continua valendo:
    contexto de quem está logado passou a vir **só** do banco: sem `conversationId`, fica vazio. O
    `history` do corpo só vale para o visitante (afeta só a conversa dele). Quem entrou no meio da
    conversa tem o começo importado no login (`POST /api/conversations/import`: dono da sessão,
-   mensagens `imported`, cota `client-write`). Testes em `chat-route.test.ts` (logado sem conversa
+   mensagens `imported`, cota `client-write` e mais uma de 5 por hora, `conversation-import`,
+   apontada pela revisão do PR #18: a rota grava o mesmo volume que abrir chamado). Testes em `chat-route.test.ts` (logado sem conversa
    gravada) e `conversation-import.test.ts`. A conversa importada continua sendo texto do navegador e
    entra no contexto da própria conversa: quem forja falas da Wen ali engana só o próprio
    atendimento (a Wen não age sem confirmação pela rota REST, com o id da sessão), e a equipe vê o
