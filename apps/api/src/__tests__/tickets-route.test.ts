@@ -15,6 +15,7 @@ const store = {
   get: vi.fn(),
   reply: vi.fn(),
   close: vi.fn(),
+  cancel: vi.fn(),
 } satisfies Record<keyof ClientTicketStore, ReturnType<typeof vi.fn>>
 const conversations = {
   list: vi.fn(),
@@ -164,11 +165,59 @@ describe('respostas e encerramento', () => {
     ).toBe(404)
   })
 
+  it('chamado cancelado também só aceita leitura', async () => {
+    // A query trata fechado e cancelado do mesmo jeito (`isTerminal`) e devolve `closed`.
+    store.reply.mockResolvedValue({ ok: false, reason: 'closed' })
+    const res = await appAs(client).request('/tickets/TKT-0001/messages', json({ content: 'oi' }))
+    expect(res.status).toBe(409)
+    expect(await res.json()).toEqual({
+      error: 'Este chamado está encerrado. Se o problema voltou, abra um novo chamado.',
+    })
+  })
+
   it('encerra o chamado', async () => {
     store.close.mockResolvedValue({ ok: true })
     const res = await appAs(client).request('/tickets/TKT-0001/close', { method: 'POST' })
     expect(res.status).toBe(200)
     expect(store.close).toHaveBeenCalledWith('c1', 'TKT-0001')
+  })
+})
+
+describe('POST /tickets/:code/cancel', () => {
+  it('cancela o chamado do cliente da sessão', async () => {
+    store.cancel.mockResolvedValue({ ok: true })
+    const res = await appAs(client).request('/tickets/TKT-0001/cancel', json({ clientId: 'outro' }))
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ status: 'cancelled' })
+    expect(store.cancel).toHaveBeenCalledWith('c1', 'TKT-0001')
+  })
+
+  it('chamado de outra pessoa ou código inválido dá 404', async () => {
+    store.cancel.mockResolvedValue({ ok: false, reason: 'not_found' })
+    expect(
+      (await appAs(client).request('/tickets/TKT-0009/cancel', { method: 'POST' })).status,
+    ).toBe(404)
+    expect((await appAs(client).request('/tickets/abc/cancel', { method: 'POST' })).status).toBe(
+      404,
+    )
+    expect(store.cancel).toHaveBeenCalledTimes(1)
+  })
+
+  it('já respondido pela equipe (ou fora de "Aberto") dá 409 NOT_CANCELLABLE', async () => {
+    store.cancel.mockResolvedValue({ ok: false, reason: 'not_cancellable' })
+    const res = await appAs(client).request('/tickets/TKT-0001/cancel', { method: 'POST' })
+    expect(res.status).toBe(409)
+    expect(await res.json()).toMatchObject({ code: 'NOT_CANCELLABLE' })
+  })
+
+  it('visitante recebe 401 e equipe recebe 403', async () => {
+    expect((await appAs(null).request('/tickets/TKT-0001/cancel', { method: 'POST' })).status).toBe(
+      401,
+    )
+    expect((await appAs(tech).request('/tickets/TKT-0001/cancel', { method: 'POST' })).status).toBe(
+      403,
+    )
+    expect(store.cancel).not.toHaveBeenCalled()
   })
 })
 

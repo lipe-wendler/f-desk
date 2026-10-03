@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import {
   addClientReply,
   addStaffReply,
+  cancelClientTicket,
   closeClientTicket,
   consumeChatQuota,
   createTicket,
@@ -84,6 +85,7 @@ app.route(
       get: getClientTicket,
       reply: addClientReply,
       close: closeClientTicket,
+      cancel: cancelClientTicket,
     },
     {
       create: createQuota(env.TICKET_CREATE_LIMIT, 3600, consumeChatQuota),

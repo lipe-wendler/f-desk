@@ -123,6 +123,7 @@ const ticketStore = {
   get: vi.fn(),
   reply: vi.fn(),
   close: vi.fn(),
+  cancel: vi.fn(),
 } satisfies Record<keyof ClientTicketStore, ReturnType<typeof vi.fn>>
 const conversationStore = {
   list: vi.fn(),
@@ -179,6 +180,7 @@ describe('dados de outro cliente', () => {
     ticketStore.get.mockResolvedValue(null)
     ticketStore.reply.mockResolvedValue({ ok: false, reason: 'not_found' })
     ticketStore.close.mockResolvedValue({ ok: false, reason: 'not_found' })
+    ticketStore.cancel.mockResolvedValue({ ok: false, reason: 'not_found' })
     ticketStore.list.mockResolvedValue({ tickets: [], total: 0 })
     const app = appAs(clientA)
 
@@ -190,11 +192,15 @@ describe('dados de outro cliente', () => {
     expect((await app.request('/tickets/TKT-0042/close', json({ clientId: 'cB' }))).status).toBe(
       404,
     )
+    expect((await app.request('/tickets/TKT-0042/cancel', json({ clientId: 'cB' }))).status).toBe(
+      404,
+    )
     await app.request('/tickets?clientId=cB')
 
     expect(ticketStore.get).toHaveBeenCalledWith('cA', 'TKT-0042')
     expect(ticketStore.reply).toHaveBeenCalledWith('cA', 'TKT-0042', 'oi')
     expect(ticketStore.close).toHaveBeenCalledWith('cA', 'TKT-0042')
+    expect(ticketStore.cancel).toHaveBeenCalledWith('cA', 'TKT-0042')
     expect(ticketStore.list).toHaveBeenCalledWith(expect.objectContaining({ clientId: 'cA' }))
   })
 
@@ -251,14 +257,16 @@ describe('limite de escrita', () => {
     expect(ticketStore.create).not.toHaveBeenCalled()
   })
 
-  it('responder e encerrar contam na cota de escrita do cliente', async () => {
+  it('responder, encerrar e cancelar contam na cota de escrita do cliente', async () => {
     const app = appAs(clientA, { write: blocked })
     expect((await app.request('/tickets/TKT-0001/messages', json({ content: 'oi' }))).status).toBe(
       429,
     )
     expect((await app.request('/tickets/TKT-0001/close', json({}))).status).toBe(429)
+    expect((await app.request('/tickets/TKT-0001/cancel', json({}))).status).toBe(429)
     expect(ticketStore.reply).not.toHaveBeenCalled()
     expect(ticketStore.close).not.toHaveBeenCalled()
+    expect(ticketStore.cancel).not.toHaveBeenCalled()
   })
 
   it('feedback de conversa conta na cota de escrita do cliente', async () => {
