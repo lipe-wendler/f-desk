@@ -1,4 +1,4 @@
-import type { ChatMessage, RequestKind } from '@f-desk/shared'
+import { fallbackTitle, type ChatMessage, type RequestKind } from '@f-desk/shared'
 import { and, desc, eq, lt, sql } from 'drizzle-orm'
 import { db } from '../client'
 import { chatRateLimit, conversation, conversationMessage } from '../schema'
@@ -169,4 +169,36 @@ export async function getConversationHistory(
     .orderBy(desc(conversationMessage.id))
     .limit(limit)
   return rows.reverse()
+}
+
+/**
+ * Conversa que o visitante teve com a Wen antes de entrar: vira uma conversa da conta, com as
+ * mensagens marcadas como `imported` (vieram do navegador; a equipe vê o aviso de trecho não
+ * verificado). Conversa e mensagens num `batch`, que é transacional no driver HTTP. Devolve o id.
+ */
+export async function importConversation({
+  userId,
+  transcript,
+}: {
+  userId: string
+  transcript: ChatMessage[]
+}) {
+  const id = crypto.randomUUID()
+  const firstQuestion = transcript.find((m) => m.role === 'user')?.content
+  await db.batch([
+    db.insert(conversation).values({
+      id,
+      userId,
+      title: firstQuestion ? fallbackTitle(firstQuestion) : null,
+    }),
+    db.insert(conversationMessage).values(
+      transcript.map((m) => ({
+        conversationId: id,
+        role: m.role,
+        content: m.content,
+        imported: true,
+      })),
+    ),
+  ])
+  return id
 }

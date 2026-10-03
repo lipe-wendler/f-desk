@@ -1,5 +1,10 @@
-import type { getConversation, listConversations, saveConversationFeedback } from '@f-desk/db'
-import { GUIDED_FEEDBACK } from '@f-desk/shared'
+import type {
+  getConversation,
+  importConversation,
+  listConversations,
+  saveConversationFeedback,
+} from '@f-desk/db'
+import { GUIDED_FEEDBACK, fieldErrors, importConversationSchema } from '@f-desk/shared'
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { requireRole } from '../middleware/require-role'
@@ -10,6 +15,7 @@ export interface ConversationStore {
   list: typeof listConversations
   get: typeof getConversation
   feedback: typeof saveConversationFeedback
+  import: typeof importConversation
 }
 
 const feedbackSchema = z.object({ resolved: z.boolean() })
@@ -42,6 +48,19 @@ export function createConversationsRoute(
           ...(q ? { search: q } : {}),
         })
         return c.json(result)
+      })
+      // Conversa do visitante que entrou na conta (pelo cartão do chamado, por exemplo): vira uma
+      // conversa dele, com o dono da sessão e as mensagens marcadas como importadas.
+      .post('/import', limitPerUser('client-write', limits.write), async (c) => {
+        const parsed = importConversationSchema.safeParse(await c.req.json().catch(() => null))
+        if (!parsed.success) {
+          return c.json({ error: 'Conversa inválida.', fields: fieldErrors(parsed.error) }, 400)
+        }
+        const conversationId = await store.import({
+          userId: c.get('user')!.id,
+          transcript: parsed.data.transcript,
+        })
+        return c.json({ conversationId }, 201)
       })
       // "Resolveu" / "Não resolveu" depois de uma resposta pronta: vira mensagem da conversa e muda o status.
       // Os textos são os do atendimento guiado; o cliente só diz se resolveu.

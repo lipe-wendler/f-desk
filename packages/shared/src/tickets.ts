@@ -106,6 +106,15 @@ export const createTicketSchema = z.object({
 })
 export type CreateTicketInput = z.infer<typeof createTicketSchema>
 
+/**
+ * Conversa do visitante levada para a conta quando ele entra: a mesma transcrição que acompanha o
+ * chamado (até 100 mensagens), com pelo menos uma.
+ */
+export const importConversationSchema = createTicketSchema
+  .pick({ transcript: true })
+  .refine((data) => data.transcript.length > 0, { error: 'A conversa está vazia.' })
+export type ImportConversationInput = z.infer<typeof importConversationSchema>
+
 /** Assunto e descrição que o Wen propõe para o chamado (os mesmos limites do formulário). */
 export const ticketProposalSchema = createTicketSchema.pick({ subject: true, description: true })
 export type TicketProposal = z.infer<typeof ticketProposalSchema>
