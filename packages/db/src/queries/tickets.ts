@@ -200,11 +200,14 @@ export async function getClientTicket(clientId: string, code: string) {
 }
 
 export type ClientReplyResult =
-  { ok: true; status: TicketStatus } | { ok: false; reason: 'not_found' | 'closed' | 'conflict' }
+  | { ok: true; status: TicketStatus }
+  | { ok: false; reason: 'not_found' | 'closed' | 'resolved' | 'conflict' }
 
 /**
  * Resposta do cliente. Se o chamado esperava por ele ou estava resolvido, volta para
  * "Em atendimento" (resolvido + resposta = o problema voltou). Fechado ou cancelado não aceita resposta.
+ * Com `reopen: false` (informação adicionada pela Wen), resolvido também recusa: a regra fica aqui,
+ * e não só no prompt, porque um problema novo deve virar outro chamado.
  * Mensagem e status são gravados juntos e só se o chamado não mudou desde a leitura
  * (`updateWithMessage`); se mudou, relê uma vez.
  */
@@ -212,11 +215,14 @@ export async function addClientReply(
   clientId: string,
   code: string,
   content: string,
+  options: { reopen?: boolean } = {},
 ): Promise<ClientReplyResult> {
   for (let attempt = 0; attempt < WRITE_ATTEMPTS; attempt++) {
     const found = await findClientTicket(clientId, code)
     if (!found) return { ok: false, reason: 'not_found' }
     if (isTerminal(found.status)) return { ok: false, reason: 'closed' }
+    if (options.reopen === false && found.status === 'resolved')
+      return { ok: false, reason: 'resolved' }
 
     const reopen = found.status === 'waiting_client' || found.status === 'resolved'
     const status: TicketStatus = reopen ? 'in_progress' : found.status

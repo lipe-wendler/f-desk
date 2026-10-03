@@ -198,7 +198,7 @@ describe('dados de outro cliente', () => {
     await app.request('/tickets?clientId=cB')
 
     expect(ticketStore.get).toHaveBeenCalledWith('cA', 'TKT-0042')
-    expect(ticketStore.reply).toHaveBeenCalledWith('cA', 'TKT-0042', 'oi')
+    expect(ticketStore.reply).toHaveBeenCalledWith('cA', 'TKT-0042', 'oi', { reopen: true })
     expect(ticketStore.close).toHaveBeenCalledWith('cA', 'TKT-0042')
     expect(ticketStore.cancel).toHaveBeenCalledWith('cA', 'TKT-0042')
     expect(ticketStore.list).toHaveBeenCalledWith(expect.objectContaining({ clientId: 'cA' }))

@@ -21,6 +21,7 @@ import ChatHeader from './ChatHeader.vue'
 import ChatWelcome from './ChatWelcome.vue'
 import ChatBubble from './conversation/ChatBubble.vue'
 import OptionList from './conversation/OptionList.vue'
+import TicketActionCard from './conversation/TicketActionCard.vue'
 import TicketCreatedCard from './conversation/TicketCreatedCard.vue'
 import TicketProposalCard from './conversation/TicketProposalCard.vue'
 import './chat.css'
@@ -63,6 +64,8 @@ const ticket = computed(() => chat.tickets.at(-1))
 const pendingProposal = computed(() =>
   chat.messages.findLast((m) => m.proposal?.state === 'pending'),
 )
+/** Ação num chamado preparada pela Wen, à espera da confirmação (também fica fixa embaixo). */
+const pendingAction = computed(() => chat.messages.findLast((m) => m.action?.state === 'pending'))
 
 const SUGGESTION_ICONS: Record<string, IconName> = {
   'sem-acesso-conta': 'key',
@@ -143,9 +146,9 @@ watch(
   },
 )
 
-// O box do chamado ocupa espaço embaixo: quem estava no fim continua vendo a última fala.
+// Os boxes ocupam espaço embaixo: quem estava no fim continua vendo a última fala.
 watch(
-  () => pendingProposal.value?.id,
+  () => `${pendingProposal.value?.id}:${pendingAction.value?.id}`,
   async () => {
     if (!atBottom.value) return
     await nextTick()
@@ -168,7 +171,9 @@ function announceLast() {
   announcement.value =
     last.proposal?.state === 'pending'
       ? `Wen: ${last.content} Chamado preparado: confira e confirme acima do campo de mensagem.`
-      : `Wen: ${last.content}`
+      : last.action?.state === 'pending'
+        ? `Wen: ${last.content} Ação no chamado ${last.action.code} preparada: confirme acima do campo de mensagem.`
+        : `Wen: ${last.content}`
 }
 
 /** Depois de uma troca gravada: a lista da sidebar sobe a conversa e a URL passa a apontar para ela. */
@@ -279,6 +284,18 @@ async function afterProposal(handler: () => unknown) {
   await handler()
 }
 
+/** Confirmação do box da ação (fica aqui pelo mesmo motivo do chamado: o box some ao confirmar). */
+async function confirmAction(entryId: string) {
+  const result = await chat.confirmAction(entryId)
+  if (result.ok) {
+    const action = chat.messages.find((m) => m.id === entryId)?.action
+    await afterProposal(() => {
+      if (action) announcement.value = `Feito: ${action.code} atualizado.`
+    })
+  }
+  return result
+}
+
 async function newConversation() {
   chat.reset()
   await router.push({ name: 'chat' })
@@ -357,6 +374,11 @@ async function newConversation() {
                   :entry-id="m.id"
                   :proposal="m.proposal"
                 />
+                <TicketActionCard
+                  v-if="m.action?.state === 'done' || m.action?.state === 'dismissed'"
+                  :entry-id="m.id"
+                  :action="m.action"
+                />
               </ChatBubble>
             </li>
           </ol>
@@ -402,6 +424,14 @@ async function newConversation() {
           :proposal="pendingProposal.proposal"
           :open="(input: TicketProposal) => confirmProposal(pendingProposal!.id, input)"
           @dismissed="afterProposal(proposalDismissed)"
+        />
+        <TicketActionCard
+          v-if="pendingAction?.action && !chat.sending"
+          :key="`action-${pendingAction.id}`"
+          :entry-id="pendingAction.id"
+          :action="pendingAction.action"
+          :run="() => confirmAction(pendingAction!.id)"
+          @dismissed="afterProposal(() => (announcement = 'Ação descartada.'))"
         />
         <ChatComposer
           ref="composer"

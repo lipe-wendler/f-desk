@@ -85,6 +85,27 @@ Navegador ──► Vercel (mesmo domínio)
       fala e não propõe outro chamado. A proposta pendente ou descartada fica só no navegador.
   - **Limite:** 20 mensagens a cada 10 minutos por conta ou por IP, contado no Postgres
     (`chat_rate_limit`; serverless não compartilha memória). O IP é guardado como hash.
+  - **Wen e os chamados do cliente** (`services/llm/ticket-tools.ts`, só cliente logado):
+    - As ferramentas são montadas a cada pedido (`buildTicketTools({ userId, store })`), com o id **da
+      sessão** numa closure. Nenhum `inputSchema` aceita id de usuário, cliente ou e-mail. Visitante e
+      equipe continuam só com `proporChamado`.
+    - Leitura: `listarMeusChamados` (até 10: código, assunto, status e data) e `consultarChamado` (status,
+      descrição e as últimas 5 mensagens públicas, truncadas, sem e-mail). Chamado inexistente e de outra
+      pessoa dão a mesma resposta: "não encontrado".
+    - Ações: `proporInformacao`, `proporCancelamento` e `proporResolucao`. O `execute` só confere o dono e
+      se a ação vale para o status (informação: aberto, em atendimento ou aguardando cliente; cancelar:
+      `canCancel`; resolver: não encerrado) e devolve o resultado ao modelo. Nada muda no servidor: a
+      proposta válida vira o evento `ticket-action-proposal` (código e assunto vêm do banco). Recusada, a
+      Wen explica o motivo e, para chamado encerrado, oferece um chamado novo citando o antigo.
+    - O cartão (`TicketActionCard`, fixo acima do campo como o de chamado) tem "Confirmar" e "Agora não".
+      Confirmar chama a rota de chamados (`confirmAction` na store): informação com
+      `POST /tickets/:code/messages` e `{ reopen: false }` (chamado resolvido responde 409 `RESOLVED` em
+      vez de reabrir; a resposta pela tela continua reabrindo), cancelar e "já resolvi" nas rotas da
+      tarefa 18.
+    - Até 3 passos do modelo por mensagem (`stopWhen: stepCountIs(3)`, e `proporChamado` encerra a
+      resposta). A mensagem conta uma vez na cota do chat; o teto de passos limita o custo dela.
+    - O resultado das ferramentas fica só naquela chamada ao modelo: não é gravado em
+      `conversation_message`. Falha no banco chega ao modelo como erro genérico, sem detalhe interno.
   - **Contexto:** logado, o histórico que vai ao LLM vem só do banco: com `conversationId`, o gravado
     (`getConversationHistory`), ou nenhum se a conversa não for dele; sem `conversationId`, nenhum. O
     `history` enviado só vale para o visitante (afeta só a conversa dele). Quem entrou no meio da
@@ -135,8 +156,8 @@ Navegador ──► Vercel (mesmo domínio)
   - Métrica "Resolvidos": chamados com `resolved_at` nos últimos 7 dias (equipe ou "Já resolvi");
     cancelado nunca tem `resolved_at`, então não conta. A primeira resposta pública num chamado aberto o coloca em atendimento e, sem
     responsável, atribui a quem respondeu. Nota interna não muda status nem a data de atualização.
-- **Contexto da Wen:** a mensagem atual vai com uma nota dizendo se a pessoa está logada (as instruções
-  fixas não mudam, para o prefixo continuar em cache).
+- **Contexto da Wen:** a mensagem atual vai com uma nota dizendo quem está conversando (visitante,
+  cliente ou equipe); as instruções fixas não mudam, para o prefixo continuar em cache.
 
 ## Modelo de dados
 
@@ -205,4 +226,4 @@ falha (em produção, a versão anterior continua no ar). Fluxo em [deploy.md](d
 16. ~~`feat/criar-conta-pelo-cartao-de-chamado`~~ — concluída
 17. ~~`chore/conferir-migrations-pendentes-no-deploy`~~ — concluída ([fluxo de migrations](deploy.md#a-cada-mudança-no-banco-migrations))
 18. ~~`feat/cancelar-e-resolver-chamado-pelo-cliente`~~ — concluída
-19. `feat/wen-consulta-e-acoes-em-chamados`
+19. ~~`feat/wen-consulta-e-acoes-em-chamados`~~ — concluída

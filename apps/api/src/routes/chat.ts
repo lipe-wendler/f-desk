@@ -1,5 +1,6 @@
 import type { ChatExchange } from '@f-desk/db'
 import {
+  CHAT_ACTION_REPLY,
   CHAT_ERROR_REPLY,
   CHAT_FALLBACK_REPLY,
   CHAT_PROPOSAL_REPLY,
@@ -14,15 +15,18 @@ import {
   type ChatEvent,
   type ChatMessage,
   type ChatReplySource,
+  type TicketActionProposal,
   type TicketProposal,
 } from '@f-desk/shared'
 import type { LanguageModel } from 'ai'
 import { Hono } from 'hono'
+import { isBanned } from '../middleware/require-role'
 import type { AppEnv } from '../middleware/session'
 import { isTicketRequest } from '../services/faq/intent'
 import { matchFaq } from '../services/faq/match'
 import { describeConversation, type ConversationMeta } from '../services/llm/meta'
-import { streamWenReply } from '../services/llm/reply'
+import { streamWenReply, type WenAudience } from '../services/llm/reply'
+import type { WenTicketStore } from '../services/llm/ticket-tools'
 import { clientIp, quotaKey, type ConsumeQuota } from '../services/rate-limit'
 
 /** Respostas do "Resolveu?" que ficam fora da descrição do chamado montado sem LLM. */
@@ -42,6 +46,11 @@ export interface ChatDeps {
    * contexto do LLM vem só daqui, nunca do `history` do corpo, que o navegador pode forjar.
    */
   loadHistory?: (userId: string, conversationId: string) => Promise<ChatMessage[] | null>
+  /**
+   * Chamados do cliente para as ferramentas da Wen (consultar e propor ações). Só cliente logado
+   * recebe as ferramentas, sempre com o id da sessão; visitante e equipe ficam só com `proporChamado`.
+   */
+  tickets?: WenTicketStore
 }
 
 /**
@@ -105,23 +114,36 @@ export function createChatRoute(deps: ChatDeps) {
             send(faq ? { type: 'start', source, faqId: faq.entry.id } : { type: 'start', source })
             let reply = ''
             let proposal: TicketProposal | undefined
+            let action: TicketActionProposal | undefined
             try {
               if (source === 'llm' && deps.model) {
+                // Conta desativada fica como visitante: as ferramentas de chamados ficam do lado de
+                // fora do `requireRole`, então a mesma regra de desativação vale aqui.
+                const audience: WenAudience =
+                  !user || isBanned(user) ? 'visitor' : user.role === 'client' ? 'client' : 'staff'
                 for await (const part of streamWenReply(deps.model, history, message, {
-                  loggedIn: Boolean(user),
+                  audience,
                   ticketRequested,
                   abortSignal: signal,
+                  tickets:
+                    audience === 'client' && deps.tickets
+                      ? { userId: user!.id, store: deps.tickets }
+                      : undefined,
                 })) {
                   if (part.type === 'proposal') {
                     proposal = { subject: part.subject, description: part.description }
+                    continue
+                  }
+                  if (part.type === 'action') {
+                    action = part.proposal
                     continue
                   }
                   reply += part.text
                   send({ type: 'delta', text: part.text })
                 }
                 // O modelo só chamou a ferramenta: a conversa ainda precisa de uma fala do Wen.
-                if (proposal && !reply.trim()) {
-                  reply = CHAT_PROPOSAL_REPLY
+                if ((proposal || action) && !reply.trim()) {
+                  reply = proposal ? CHAT_PROPOSAL_REPLY : CHAT_ACTION_REPLY
                   send({ type: 'delta', text: reply })
                 }
               } else if (faq) {
@@ -185,8 +207,9 @@ export function createChatRoute(deps: ChatDeps) {
                 console.error('[chat] falha ao gravar a conversa', error)
               }
             }
-            // A proposta vai antes do fim; o chamado só é aberto quando o cliente confirmar.
+            // As propostas vão antes do fim; nada muda até o cliente confirmar no cartão.
             if (proposal) send({ type: 'ticket-proposal', ...proposal })
+            if (action) send({ type: 'ticket-action-proposal', ...action })
             // Título e tipo só vão para a tela na conversa nova (numa existente o banco mantém os primeiros).
             send(
               savedId && meta && !conversationId

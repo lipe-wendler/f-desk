@@ -12,15 +12,15 @@ Status de cada achado:
 
 ## Superfície
 
-| Rota                                      | Acesso                                    | Escopo                                                                 |
-| ----------------------------------------- | ----------------------------------------- | ---------------------------------------------------------------------- |
-| `GET /api/health`                         | pública                                   | —                                                                      |
-| `/api/auth/*` (better-auth)               | pública + `adminGuard` nas rotas de admin | sessão do better-auth; origem conferida por `trustedOrigins`           |
-| `GET /api/admin/users`                    | `admin`                                   | todos (por definição)                                                  |
-| `GET /api/chat/status` · `POST /api/chat` | pública, com cota                         | conversa gravada só para o dono (`saveChatExchange` confere `user_id`) |
-| `/api/tickets/*`                          | `client`                                  | `client_id` da sessão em toda query; de outra pessoa é 404             |
-| `/api/conversations/*`                    | `client`                                  | `user_id` da sessão em toda query (inclusive na importação)            |
-| `/api/staff/*`                            | `technician` e `admin`                    | todos os chamados (a equipe atende a fila inteira)                     |
+| Rota                                      | Acesso                                    | Escopo                                                                                                                              |
+| ----------------------------------------- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/health`                         | pública                                   | —                                                                                                                                   |
+| `/api/auth/*` (better-auth)               | pública + `adminGuard` nas rotas de admin | sessão do better-auth; origem conferida por `trustedOrigins`                                                                        |
+| `GET /api/admin/users`                    | `admin`                                   | todos (por definição)                                                                                                               |
+| `GET /api/chat/status` · `POST /api/chat` | pública, com cota                         | conversa gravada só para o dono (`saveChatExchange` confere `user_id`); ferramentas da Wen só leem os chamados do cliente da sessão |
+| `/api/tickets/*`                          | `client`                                  | `client_id` da sessão em toda query; de outra pessoa é 404                                                                          |
+| `/api/conversations/*`                    | `client`                                  | `user_id` da sessão em toda query (inclusive na importação)                                                                         |
+| `/api/staff/*`                            | `technician` e `admin`                    | todos os chamados (a equipe atende a fila inteira)                                                                                  |
 
 O que já estava bom e continua valendo:
 
@@ -29,8 +29,14 @@ O que já estava bom e continua valendo:
 - **Validação**: zod em todo corpo, query e parâmetro de rota (`TICKET_CODE_PATTERN`, `z.uuid()`).
 - **XSS**: nenhum `v-html`, `innerHTML` ou renderização de Markdown; tudo é interpolação do Vue.
 - **Perfil**: o cadastro público sempre cria `client` (`role` com `input: false`; teste em `app.test.ts`).
-- **Chatbot**: a Wen não tem ferramenta que leia ou grave no banco. `proporChamado` não tem `execute`:
-  o chamado só é aberto quando o cliente confirma, pela rota de chamados, com o id da sessão.
+- **Chatbot**: a Wen não grava nada no banco. `proporChamado` não tem `execute`: o chamado só é aberto
+  quando o cliente confirma, pela rota de chamados, com o id da sessão. Desde a tarefa 19, o cliente
+  logado ganha ferramentas que **leem** os próprios chamados e **propõem** ações
+  (`services/llm/ticket-tools.ts`). Elas são montadas por requisição, com o id da sessão numa closure:
+  nenhum `inputSchema` aceita id de usuário, cliente ou e-mail, e chamado de outra pessoa responde "não
+  encontrado". As ações só conferem dono e elegibilidade; a mudança acontece no "Confirmar" do cartão,
+  pela rota REST. Visitante e equipe ficam só com `proporChamado`. Falha no banco chega ao modelo como
+  erro genérico, e o conteúdo dos chamados entra no prompt como dado, nunca como instrução.
 - **Redirecionamento**: `safeRedirect` impede redirecionar para fora do site depois do login.
 - **Notas internas** nunca saem para o cliente (`getClientTicket` filtra `internal = false`).
 
@@ -115,6 +121,11 @@ O que já estava bom e continua valendo:
     repete a connection string na mensagem de erro, e ela iria para o build log, que todo o time da
     Vercel vê. **Correção:** o script valida a URL sem ecoá-la e, em qualquer erro, loga só nome e
     código (`safeErrorSummary`). Teste em `migrations-status.test.ts`.
+19. ⚠️ **Mensagem da Wen com até 3 chamadas ao provedor** (tarefa 19). Com as ferramentas de chamados,
+    uma mensagem de cliente logado pode custar até 3 passos do modelo (`MAX_STEPS` em
+    `services/llm/reply.ts`), mas conta uma vez só na cota do chat (20 a cada 10 minutos). É
+    intencional: o teto limita o custo de cada mensagem, e visitante e equipe continuam com um passo
+    só. Rever se o custo do provedor pesar.
 
 ## Checklist de infraestrutura
 

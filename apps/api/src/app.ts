@@ -73,6 +73,7 @@ app.route(
     saveExchange: saveChatExchange,
     secret: env.BETTER_AUTH_SECRET,
     loadHistory: (userId, id) => getConversationHistory(userId, id, CHAT_HISTORY_MAX),
+    tickets: { list: listClientTickets, get: getClientTicket },
   }),
 )
 
