@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { formatMessageTime } from '../../../lib/format'
 import type { ChatEntry } from '../../../stores/chat'
+import ToolActivityList from './ToolActivityList.vue'
 import TypingDots from './TypingDots.vue'
 
 /**
  * Uma fala da conversa. Cliente: amarelo, à direita. Wen: cinza, à esquerda, com o avatar.
  * O nome de quem fala vai em texto para leitores de tela (o avatar é decorativo). Embaixo, o horário.
+ * Antes da fala da Wen, o que ela fez com as ferramentas (consultou chamados, preparou uma ação).
  */
 defineProps<{ entry: ChatEntry }>()
 </script>
@@ -24,7 +26,9 @@ defineProps<{ entry: ChatEntry }>()
       class="flex min-w-0 flex-col gap-1"
       :class="entry.role === 'user' ? 'items-end' : 'items-start'"
     >
+      <ToolActivityList v-if="entry.tools?.length" :tools="entry.tools" />
       <p
+        v-if="entry.content || entry.pending || entry.role === 'user'"
         :class="[
           'chat-bubble',
           entry.role === 'user' ? 'chat-bubble-user' : 'chat-bubble-bot',
@@ -32,7 +36,8 @@ defineProps<{ entry: ChatEntry }>()
         ]"
       >
         <span class="sr-only">{{ entry.role === 'user' ? 'Você:' : 'Wen:' }}</span>
-        <TypingDots v-if="entry.pending && !entry.content" />
+        <TypingDots v-if="entry.pending && !entry.content && !entry.tools?.length" />
+        <span v-else-if="entry.pending && !entry.content" class="text-ink-muted">…</span>
         <template v-else>{{ entry.content }}</template>
       </p>
       <time

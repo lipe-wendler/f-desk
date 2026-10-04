@@ -22,6 +22,7 @@ import ChatWelcome from './ChatWelcome.vue'
 import ChatBubble from './conversation/ChatBubble.vue'
 import OptionList from './conversation/OptionList.vue'
 import TicketActionCard from './conversation/TicketActionCard.vue'
+import TicketChoiceList from './conversation/TicketChoiceList.vue'
 import TicketCreatedCard from './conversation/TicketCreatedCard.vue'
 import TicketProposalCard from './conversation/TicketProposalCard.vue'
 import './chat.css'
@@ -171,9 +172,11 @@ function announceLast() {
   announcement.value =
     last.proposal?.state === 'pending'
       ? `Wen: ${last.content} Chamado preparado: confira e confirme acima do campo de mensagem.`
-      : last.action?.state === 'pending'
-        ? `Wen: ${last.content} Ação no chamado ${last.action.code} preparada: confirme acima do campo de mensagem.`
-        : `Wen: ${last.content}`
+      : last.ticketList?.length
+        ? `Wen: ${last.content} ${last.ticketList.length} chamado(s) listado(s) para escolher.`
+        : last.action?.state === 'pending'
+          ? `Wen: ${last.content} Ação no chamado ${last.action.code} preparada: confirme acima do campo de mensagem.`
+          : `Wen: ${last.content}`
 }
 
 /** Depois de uma troca gravada: a lista da sidebar sobe a conversa e a URL passa a apontar para ela. */
@@ -284,6 +287,18 @@ async function afterProposal(handler: () => unknown) {
   await handler()
 }
 
+/** Chamado escolhido na lista da Wen: vira a fala da pessoa e a conversa continua sobre ele. */
+async function chooseTicket(entryId: string, code: string) {
+  const before = chat.conversationId
+  atBottom.value = true
+  if (!(await chat.chooseTicket(entryId, code))) return
+  // O clique foi no meio da conversa: a resposta (e o cartão que vier com ela) fica no fim.
+  await nextTick()
+  scrollToEnd()
+  announceLast()
+  await afterSaved(before, chat.messages.findLast((m) => m.role === 'user')?.content ?? '')
+}
+
 /** Confirmação do box da ação (fica aqui pelo mesmo motivo do chamado: o box some ao confirmar). */
 async function confirmAction(entryId: string) {
   const result = await chat.confirmAction(entryId)
@@ -364,6 +379,13 @@ async function newConversation() {
                     <FwIcon name="close" size="sm" />{{ GUIDED_FEEDBACK.unresolved.label }}
                   </button>
                 </div>
+                <TicketChoiceList
+                  v-if="m.ticketList?.length"
+                  :tickets="m.ticketList"
+                  :chosen="m.ticketChosen"
+                  :disabled="chat.sending || m.id !== lastId"
+                  @choose="(code) => chooseTicket(m.id, code)"
+                />
                 <TicketCreatedCard
                   v-if="m.ticket"
                   :code="m.ticket.code"

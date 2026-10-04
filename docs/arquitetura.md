@@ -102,6 +102,19 @@ Navegador ──► Vercel (mesmo domínio)
       `POST /tickets/:code/messages` e `{ reopen: false }` (chamado resolvido responde 409 `RESOLVED` em
       vez de reabrir; a resposta pela tela continua reabrindo), cancelar e "já resolvi" nas rotas da
       tarefa 18.
+    - **Pergunta sobre os próprios chamados** ("quais são meus chamados?", "como anda o TKT-0042?",
+      `isTicketLookup` em `services/faq/intent.ts`): com cliente logado e LLM ligado, não vai para a
+      resposta pronta "Como acompanho meu chamado?" (que manda abrir "Meus chamados"); a Wen recebe uma
+      nota para consultar com as ferramentas. A opção do atendimento guiado com essa pergunta segue o
+      mesmo caminho. Visitante, equipe e cliente sem LLM continuam com a resposta pronta.
+    - **Lista para escolher:** quando a Wen usa `listarMeusChamados`, o evento `ticket-list` leva os
+      chamados (código, assunto, status e data, vindos do banco) e a tela os mostra como botões sob a fala
+      dela (`TicketChoiceList`). Escolher um vira a fala "Quero falar sobre o TKT-…" e a Wen continua
+      sobre ele.
+    - **O que a Wen fez:** cada chamada de ferramenta vira o evento `tool` na hora (`running` e depois
+      `done`, `refused`, `not_found` ou `error`), e a tela mostra linhas acima da fala, como os passos do
+      Claude ("Consultei seus chamados em aberto (2)", "Preparei o cancelamento do TKT-0042"). Os textos
+      ficam em `toolActivityLabel` (`@f-desk/shared`). Ficam só no navegador, como as propostas.
     - Até 3 passos do modelo por mensagem (`stopWhen: stepCountIs(3)`, e `proporChamado` encerra a
       resposta). A mensagem conta uma vez na cota do chat; o teto de passos limita o custo dela.
     - O resultado das ferramentas fica só naquela chamada ao modelo: não é gravado em

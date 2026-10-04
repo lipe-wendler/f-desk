@@ -44,9 +44,10 @@ const REPLY: TicketActionProposal = {
 function mockApi(
   actions: TicketActionProposal[],
   ticketRoutes: Record<string, () => Response> = {},
+  replies?: ChatEvent[][],
 ) {
   const calls: { key: string; body: unknown }[] = []
-  let replies = 0
+  let replyCount = 0
   vi.stubGlobal(
     'fetch',
     vi.fn(async (input: string, init?: RequestInit) => {
@@ -55,8 +56,12 @@ function mockApi(
       const body = init?.body ? (JSON.parse(String(init.body)) as unknown) : undefined
       calls.push({ key, body })
       if (url.pathname === '/api/chat/status') return json({ llm: true })
-      if (url.pathname === '/api/chat')
-        return ndjson(actionReply(actions[replies++ % actions.length]!))
+      if (url.pathname === '/api/chat') {
+        const n = replyCount++
+        return ndjson(
+          replies ? replies[n % replies.length]! : actionReply(actions[n % actions.length]!),
+        )
+      }
       if (ticketRoutes[key]) return ticketRoutes[key]()
       if (url.pathname === '/api/conversations') return json({ conversations: [], total: 0 })
       return json(null)
@@ -226,5 +231,85 @@ describe('ação num chamado preparada pela Wen', () => {
       rules: { 'color-contrast': { enabled: false } },
     })
     expect(results.violations).toEqual([])
+  })
+})
+
+describe('o que a Wen fez e a lista de chamados para escolher', () => {
+  const TICKETS = [
+    {
+      code: 'TKT-0042',
+      subject: SUBJECT,
+      status: 'in_progress' as const,
+      createdAt: '2026-10-01T12:00:00.000Z',
+    },
+    {
+      code: 'TKT-0043',
+      subject: 'VPN não conecta',
+      status: 'open' as const,
+      createdAt: '2026-10-02T12:00:00.000Z',
+    },
+  ]
+  const listReply: ChatEvent[] = [
+    { type: 'start', source: 'llm' },
+    { type: 'tool', id: 'c1', tool: 'listarMeusChamados', status: 'running', scope: 'abertos' },
+    {
+      type: 'tool',
+      id: 'c1',
+      tool: 'listarMeusChamados',
+      status: 'done',
+      scope: 'abertos',
+      count: 2,
+    },
+    { type: 'delta', text: 'Você tem 2 chamados em aberto. Escolha um abaixo.' },
+    { type: 'ticket-list', tickets: TICKETS },
+    { type: 'end', conversationId: CONVERSATION },
+  ]
+  const consultReply: ChatEvent[] = [
+    { type: 'start', source: 'llm' },
+    { type: 'tool', id: 'c2', tool: 'consultarChamado', status: 'running', code: 'TKT-0043' },
+    { type: 'tool', id: 'c2', tool: 'consultarChamado', status: 'done', code: 'TKT-0043' },
+    { type: 'delta', text: 'O TKT-0043 está aberto, ainda sem técnico.' },
+    { type: 'end', conversationId: CONVERSATION },
+  ]
+
+  it('mostra o que a Wen consultou e os chamados para escolher; a escolha continua a conversa', async () => {
+    const calls = mockApi([], {}, [listReply, consultReply])
+    const wrapper = await mountPage()
+    await ask(wrapper, 'quais são meus chamados?')
+
+    // Uma linha por ferramenta, já com o resultado (a mesma chamada foi atualizada no lugar).
+    const activity = wrapper.findAll('[data-testid="tool-activity"] li').map((li) => li.text())
+    expect(activity).toEqual(['Consultei seus chamados em aberto (2)'])
+    const choices = wrapper.get('[data-testid="ticket-choices"]')
+    expect(choices.text()).toContain('TKT-0042')
+    expect(choices.text()).toContain(SUBJECT)
+    expect(choices.text()).toContain('Em atendimento')
+    expect(choices.text()).toContain('VPN não conecta')
+    expect(wrapper.get('[aria-live="polite"]').text()).toContain('2 chamado(s) listado(s)')
+
+    await choices.findAll('button')[1]!.trigger('click')
+    await flushPromises()
+    const chatBodies = calls
+      .filter((c) => c.key === 'POST /api/chat')
+      .map((c) => c.body as { message: string })
+    expect(chatBodies.at(-1)!.message).toBe('Quero falar sobre o TKT-0043: VPN não conecta')
+    // A lista fica só para leitura, com o escolhido marcado; a conversa segue com a consulta.
+    const buttons = wrapper.get('[data-testid="ticket-choices"]').findAll('button')
+    expect(buttons.every((b) => b.attributes('disabled') !== undefined)).toBe(true)
+    expect(buttons[1]!.attributes('aria-current')).toBe('true')
+    expect(wrapper.text()).toContain('Consultei o TKT-0043')
+    expect(wrapper.text()).toContain('O TKT-0043 está aberto, ainda sem técnico.')
+  })
+
+  it('a lista não tem violações detectáveis pelo axe', async () => {
+    mockApi([], {}, [listReply])
+    const wrapper = await mountPage()
+    await ask(wrapper, 'quais são meus chamados?')
+    for (const selector of ['[data-testid="ticket-choices"]', '[data-testid="tool-activity"]']) {
+      const results = await axe.run(wrapper.get(selector).element, {
+        rules: { 'color-contrast': { enabled: false } },
+      })
+      expect(results.violations).toEqual([])
+    }
   })
 })

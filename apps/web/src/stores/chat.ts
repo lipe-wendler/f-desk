@@ -13,7 +13,9 @@ import {
   type ChatReplySource,
   type RequestKind,
   type TicketActionProposal,
+  type TicketChoice,
   type TicketProposal,
+  type ToolActivity,
   ticketCreatedReply,
 } from '@f-desk/shared'
 import { defineStore } from 'pinia'
@@ -46,6 +48,11 @@ export interface ChatEntry {
   ticket?: { code: string; subject: string }
   /** Ação num chamado do cliente que a Wen preparou nesta resposta: só acontece se ele confirmar. */
   action?: ActionState
+  /** O que a Wen fez com as ferramentas nesta resposta (consultou, preparou…), na ordem. */
+  tools?: ToolActivity[]
+  /** Chamados que a Wen listou para a pessoa escolher, e o escolhido. */
+  ticketList?: TicketChoice[]
+  ticketChosen?: string
 }
 
 /** Proposta de ação da Wen e o que aconteceu com ela (fica só no navegador, como a de chamado). */
@@ -192,6 +199,22 @@ export const useChatStore = defineStore('chat', () => {
           if (event.title) meta.value = { title: event.title, kind: event.kind ?? null }
           reply.createdAt = now()
           reply.pending = false
+        } else if (event.type === 'tool') {
+          // A mesma chamada chega como `running` e depois com o resultado: atualiza no lugar.
+          const activity: ToolActivity = {
+            id: event.id,
+            tool: event.tool,
+            status: event.status,
+            ...(event.code ? { code: event.code } : {}),
+            ...(event.scope ? { scope: event.scope } : {}),
+            ...(event.count !== undefined ? { count: event.count } : {}),
+          }
+          const tools = reply.tools ?? []
+          const index = tools.findIndex((t) => t.id === activity.id)
+          reply.tools =
+            index === -1 ? [...tools, activity] : tools.map((t, i) => (i === index ? activity : t))
+        } else if (event.type === 'ticket-list') {
+          reply.ticketList = event.tickets
         } else if (event.type === 'ticket-action-proposal') {
           // Uma ação à espera de cada vez: a mais nova substitui a anterior.
           replacePendingAction()
@@ -377,6 +400,20 @@ export const useChatStore = defineStore('chat', () => {
     return { ok: true }
   }
 
+  /**
+   * A pessoa escolheu um chamado da lista da Wen: vira a fala dela, com o código, e a Wen continua
+   * sobre ele (consulta pelo código). Devolve false se não deu para enviar.
+   */
+  async function chooseTicket(entryId: string, code: string) {
+    const entry = messages.value.find((m) => m.id === entryId)
+    const ticket = entry?.ticketList?.find((t) => t.code === code)
+    if (!entry || !ticket || entry.ticketChosen || sending.value) return false
+    entry.ticketChosen = code
+    const ok = await send(`Quero falar sobre o ${ticket.code}: ${ticket.subject}`)
+    if (!ok) entry.ticketChosen = undefined
+    return ok
+  }
+
   /** "Agora não" no cartão da ação: fica registrada como descartada. */
   function dismissAction(entryId: string) {
     const entry = messages.value.find((m) => m.id === entryId)
@@ -484,6 +521,7 @@ export const useChatStore = defineStore('chat', () => {
     dismissProposal,
     confirmAction,
     dismissAction,
+    chooseTicket,
     importPartial,
     loadConversation,
     reset,
