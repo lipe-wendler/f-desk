@@ -5,13 +5,17 @@ import {
   GUIDED_FEEDBACK,
   GUIDED_FLOWS,
   GUIDED_OTHER,
+  type ChatEvent,
   type ChatMessage,
   type ConversationStatus,
   type FaqCategory,
   type TicketStatus,
   type ChatReplySource,
   type RequestKind,
+  type TicketActionProposal,
+  type TicketChoice,
   type TicketProposal,
+  type ToolActivity,
   ticketCreatedReply,
 } from '@f-desk/shared'
 import { defineStore } from 'pinia'
@@ -42,6 +46,19 @@ export interface ChatEntry {
   proposal?: ProposalState
   /** Fala que registra o chamado aberto pela conversa (gravada no servidor, com o cartão). */
   ticket?: { code: string; subject: string }
+  /** Ação num chamado do cliente que a Wen preparou nesta resposta: só acontece se ele confirmar. */
+  action?: ActionState
+  /** O que a Wen fez com as ferramentas nesta resposta (consultou, preparou…), na ordem. */
+  tools?: ToolActivity[]
+  /** Chamados que a Wen listou para a pessoa escolher, e o escolhido. */
+  ticketList?: TicketChoice[]
+  ticketChosen?: string
+}
+
+/** Proposta de ação da Wen e o que aconteceu com ela (fica só no navegador, como a de chamado). */
+export type ActionState = TicketActionProposal & {
+  /** `replaced`: outra ação veio depois; some da tela. */
+  state: 'pending' | 'done' | 'dismissed' | 'replaced'
 }
 
 export interface ProposalState extends TicketProposal {
@@ -49,6 +66,15 @@ export interface ProposalState extends TicketProposal {
   state: 'pending' | 'created' | 'dismissed' | 'replaced'
   /** Código do chamado aberto a partir da proposta. */
   code?: string
+}
+
+/** A proposta de ação que veio no evento, sem o `type` do NDJSON. */
+function actionOf(
+  event: Extract<ChatEvent, { type: 'ticket-action-proposal' }>,
+): TicketActionProposal {
+  return event.action === 'reply'
+    ? { action: 'reply', code: event.code, subject: event.subject, message: event.message }
+    : { action: event.action, code: event.code, subject: event.subject }
 }
 
 /** Limite de mensagens da transcrição que vai junto com o chamado (o mesmo da API). */
@@ -173,6 +199,26 @@ export const useChatStore = defineStore('chat', () => {
           if (event.title) meta.value = { title: event.title, kind: event.kind ?? null }
           reply.createdAt = now()
           reply.pending = false
+        } else if (event.type === 'tool') {
+          // A mesma chamada chega como `running` e depois com o resultado: atualiza no lugar.
+          const activity: ToolActivity = {
+            id: event.id,
+            tool: event.tool,
+            status: event.status,
+            ...(event.code ? { code: event.code } : {}),
+            ...(event.scope ? { scope: event.scope } : {}),
+            ...(event.count !== undefined ? { count: event.count } : {}),
+          }
+          const tools = reply.tools ?? []
+          const index = tools.findIndex((t) => t.id === activity.id)
+          reply.tools =
+            index === -1 ? [...tools, activity] : tools.map((t, i) => (i === index ? activity : t))
+        } else if (event.type === 'ticket-list') {
+          reply.ticketList = event.tickets
+        } else if (event.type === 'ticket-action-proposal') {
+          // Uma ação à espera de cada vez: a mais nova substitui a anterior.
+          replacePendingAction()
+          reply.action = { ...actionOf(event), state: 'pending' }
         } else if (event.type === 'ticket-proposal') {
           // Só uma proposta fica à espera: a mais nova substitui a anterior.
           replacePending()
@@ -324,6 +370,56 @@ export const useChatStore = defineStore('chat', () => {
       if (m.proposal?.state === 'pending') m.proposal = { ...m.proposal, state: 'replaced' }
   }
 
+  function replacePendingAction() {
+    for (const m of messages.value)
+      if (m.action?.state === 'pending') m.action = { ...m.action, state: 'replaced' }
+  }
+
+  /**
+   * O cliente confirmou a ação que a Wen preparou. Vai pela rota de chamados, que confere tudo de novo
+   * (dono, status, cota): adicionar informação usa `reopen: false`, e chamado resolvido recusa.
+   */
+  async function confirmAction(
+    entryId: string,
+  ): Promise<{ ok: true } | { ok: false; error: string }> {
+    const entry = messages.value.find((m) => m.id === entryId)
+    const action = entry?.action
+    if (!entry || action?.state !== 'pending')
+      return { ok: false, error: 'Esta ação não está mais disponível.' }
+    const result =
+      action.action === 'reply'
+        ? await ticketsApi.reply(action.code, action.message, { reopen: false })
+        : action.action === 'cancel'
+          ? await ticketsApi.cancel(action.code)
+          : await ticketsApi.close(action.code)
+    if (result.error !== null) return { ok: false, error: result.error }
+    entry.action = { ...action, state: 'done' }
+    // O cabeçalho da conversa acompanha o status do chamado ligado a ela.
+    const status = result.data.status
+    tickets.value = tickets.value.map((t) => (t.code === action.code ? { ...t, status } : t))
+    return { ok: true }
+  }
+
+  /**
+   * A pessoa escolheu um chamado da lista da Wen: vira a fala dela, com o código, e a Wen continua
+   * sobre ele (consulta pelo código). Devolve false se não deu para enviar.
+   */
+  async function chooseTicket(entryId: string, code: string) {
+    const entry = messages.value.find((m) => m.id === entryId)
+    const ticket = entry?.ticketList?.find((t) => t.code === code)
+    if (!entry || !ticket || entry.ticketChosen || sending.value) return false
+    entry.ticketChosen = code
+    const ok = await send(`Quero falar sobre o ${ticket.code}: ${ticket.subject}`)
+    if (!ok) entry.ticketChosen = undefined
+    return ok
+  }
+
+  /** "Agora não" no cartão da ação: fica registrada como descartada. */
+  function dismissAction(entryId: string) {
+    const entry = messages.value.find((m) => m.id === entryId)
+    if (entry?.action?.state === 'pending') entry.action = { ...entry.action, state: 'dismissed' }
+  }
+
   /** "Agora não": a proposta fica registrada como descartada; o cliente pode pedir de novo. */
   function dismissProposal(entryId: string) {
     const entry = messages.value.find((m) => m.id === entryId)
@@ -423,6 +519,9 @@ export const useChatStore = defineStore('chat', () => {
     giveFeedback,
     confirmProposal,
     dismissProposal,
+    confirmAction,
+    dismissAction,
+    chooseTicket,
     importPartial,
     loadConversation,
     reset,

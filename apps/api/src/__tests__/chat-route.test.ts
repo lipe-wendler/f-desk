@@ -1,6 +1,8 @@
 import type { ChatExchange } from '@f-desk/db'
 import {
+  CHAT_ACTION_REPLY,
   CHAT_ERROR_REPLY,
+  CHAT_LIST_REPLY,
   CHAT_FALLBACK_REPLY,
   CHAT_PROPOSAL_REPLY,
   CHAT_TICKET_DETAILS_REPLY,
@@ -77,6 +79,51 @@ function proposingModel(parts: string[], input: unknown) {
   })
 }
 
+type Step = { text?: string; calls?: { toolName: string; input: unknown }[] }
+
+/**
+ * Modelo de vários passos: cada chamada ao provedor usa o próximo passo do roteiro (texto e/ou
+ * chamadas de ferramenta). Guarda as opções de cada chamada para conferir ferramentas e resultados.
+ */
+function scriptedModel(steps: Step[]) {
+  const calls: { prompt: unknown; tools?: { name: string }[] }[] = []
+  const model = new MockLanguageModelV4({
+    doStream: async (options) => {
+      calls.push(options as unknown as (typeof calls)[number])
+      const step = steps[Math.min(calls.length - 1, steps.length - 1)]!
+      const toolCalls = step.calls ?? []
+      return {
+        stream: simulateReadableStream({
+          chunks: [
+            ...(step.text
+              ? [
+                  { type: 'text-start' as const, id: `t${calls.length}` },
+                  { type: 'text-delta' as const, id: `t${calls.length}`, delta: step.text },
+                  { type: 'text-end' as const, id: `t${calls.length}` },
+                ]
+              : []),
+            ...toolCalls.map((call, i) => ({
+              type: 'tool-call' as const,
+              toolCallId: `call-${calls.length}-${i}`,
+              toolName: call.toolName,
+              input: JSON.stringify(call.input),
+            })),
+            {
+              type: 'finish' as const,
+              finishReason: {
+                unified: toolCalls.length ? ('tool-calls' as const) : ('stop' as const),
+                raw: undefined,
+              },
+              usage,
+            },
+          ],
+        }),
+      }
+    },
+  })
+  return { model, calls }
+}
+
 const failingModel = new MockLanguageModelV4({
   doStream: async () => {
     throw new Error('cota do provedor esgotada')
@@ -92,6 +139,7 @@ function setup(
     allowed?: boolean
     describe?: ChatDeps['describe']
     loadHistory?: ChatDeps['loadHistory']
+    tickets?: ChatDeps['tickets']
   } = {},
 ) {
   const saved: ChatExchange[] = []
@@ -109,6 +157,7 @@ function setup(
     secret: 'segredo-de-teste',
     describe: opts.describe,
     loadHistory: opts.loadHistory,
+    tickets: opts.tickets,
   })
   const app = new Hono<AppEnv>()
     .use('*', async (c, next) => {
@@ -535,5 +584,474 @@ describe('POST /chat', () => {
     })
     expect(res.status).toBe(400)
     expect(quotaKeys).toHaveLength(0)
+  })
+})
+
+describe('Wen com os chamados do cliente', () => {
+  const client = { id: 'c1', role: 'client' } as Partial<User>
+  const ticket = (over: Record<string, unknown> = {}) => ({
+    code: 'TKT-0042',
+    subject: 'Impressora do financeiro não imprime',
+    description: 'A impressora do financeiro não imprime desde ontem.',
+    status: 'in_progress',
+    priority: 'medium',
+    createdAt: new Date('2026-10-01T12:00:00Z'),
+    updatedAt: new Date('2026-10-02T12:00:00Z'),
+    resolvedAt: null,
+    closedAt: null,
+    cancelledAt: null,
+    closeReason: null,
+    canCancel: false,
+    assigneeName: 'Téo',
+    messages: [
+      {
+        id: 1,
+        content: 'Qual o modelo da impressora?',
+        createdAt: new Date('2026-10-02T12:00:00Z'),
+        author: { name: 'Téo', fromClient: false },
+      },
+    ],
+    transcript: [],
+    ...over,
+  })
+
+  function ticketStore(found: ReturnType<typeof ticket> | null = ticket()) {
+    return {
+      list: vi.fn(async () => ({
+        tickets: [
+          {
+            code: 'TKT-0042',
+            subject: 'Impressora do financeiro não imprime',
+            status: 'in_progress',
+            priority: 'medium',
+            createdAt: new Date('2026-10-01T12:00:00Z'),
+            updatedAt: new Date('2026-10-02T12:00:00Z'),
+          },
+        ],
+        total: 1,
+      })),
+      get: vi.fn(async () => found),
+    }
+  }
+
+  /** O que a ferramenta devolveu ao modelo (está no prompt da chamada seguinte). */
+  const promptOf = (call: { prompt: unknown }) => JSON.stringify(call.prompt)
+  const store = (s: ReturnType<typeof ticketStore>) =>
+    s as unknown as NonNullable<ChatDeps['tickets']>
+
+  it('consultas usam o id da sessão, mesmo que o modelo mande outro', async () => {
+    const tickets = ticketStore()
+    const { model, calls } = scriptedModel([
+      { calls: [{ toolName: 'listarMeusChamados', input: { escopo: 'abertos', userId: 'c2' } }] },
+      { calls: [{ toolName: 'consultarChamado', input: { codigo: 'tkt-0042', clientId: 'c2' } }] },
+      { text: 'O TKT-0042 está em atendimento com o Téo.' },
+    ])
+    const { app, saved } = setup({
+      model,
+      user: client,
+      tickets: store(tickets),
+      describe: async () => null,
+    })
+    const { events } = await send(app, { message: 'como anda o TKT-0042?' })
+
+    expect(tickets.list).toHaveBeenCalledWith({
+      clientId: 'c1',
+      scope: 'active',
+      limit: 10,
+      offset: 0,
+    })
+    expect(tickets.get).toHaveBeenCalledWith('c1', 'TKT-0042')
+    expect(calls).toHaveLength(3)
+    // O resultado da consulta vai ao modelo, sem e-mail e com as mensagens públicas.
+    expect(promptOf(calls[2]!)).toContain('Qual o modelo da impressora?')
+    expect(promptOf(calls[2]!)).toContain('Em atendimento')
+    expect(text(events)).toBe('O TKT-0042 está em atendimento com o Téo.')
+    // Só a fala da Wen é gravada; o resultado das ferramentas não vai para a conversa.
+    expect(saved[0]?.reply).toEqual({
+      content: 'O TKT-0042 está em atendimento com o Téo.',
+      source: 'llm',
+    })
+  })
+
+  it('chamado de outro cliente responde "não encontrado", sem nada dele', async () => {
+    const tickets = ticketStore(null)
+    const { model, calls } = scriptedModel([
+      { calls: [{ toolName: 'consultarChamado', input: { codigo: 'TKT-0099' } }] },
+      { text: 'Não encontrei esse chamado entre os seus.' },
+    ])
+    const { app } = setup({
+      model,
+      user: client,
+      tickets: store(tickets),
+      describe: async () => null,
+    })
+    const { events } = await send(app, { message: 'me mostra o TKT-0099' })
+    expect(tickets.get).toHaveBeenCalledWith('c1', 'TKT-0099')
+    expect(promptOf(calls[1]!)).toContain('Chamado não encontrado entre os chamados desta pessoa')
+    expect(events.some((e) => e.type === 'ticket-action-proposal')).toBe(false)
+  })
+
+  it('visitante e equipe não recebem as ferramentas de chamados; o cliente recebe', async () => {
+    const names = async (user?: Partial<User>) => {
+      const { model, calls } = streamingModel(['ok'])
+      const { app } = setup({
+        model,
+        user,
+        tickets: store(ticketStore()),
+        describe: async () => null,
+      })
+      await send(app, { message: 'o sistema de notas fiscais mostra erro 503' })
+      return (calls[0] as { tools?: { name: string }[] }).tools?.map((t) => t.name).sort()
+    }
+    expect(await names()).toEqual(['proporChamado'])
+    expect(await names({ id: 't1', role: 'technician' })).toEqual(['proporChamado'])
+    expect(await names({ id: 'a1', role: 'admin' })).toEqual(['proporChamado'])
+    expect(await names(client)).toEqual([
+      'consultarChamado',
+      'listarMeusChamados',
+      'proporCancelamento',
+      'proporChamado',
+      'proporInformacao',
+      'proporResolucao',
+    ])
+  })
+
+  it('nenhuma ferramenta aceita id de usuário, cliente ou e-mail', async () => {
+    const { model, calls } = streamingModel(['ok'])
+    const { app } = setup({
+      model,
+      user: client,
+      tickets: store(ticketStore()),
+      describe: async () => null,
+    })
+    await send(app, { message: 'o sistema de notas fiscais mostra erro 503' })
+    const schemas = JSON.stringify((calls[0] as { tools?: unknown[] }).tools)
+    expect(schemas).not.toMatch(/userId|clientId|email|usuario|cliente_id/i)
+  })
+
+  it('proposta válida vira evento com código e assunto do banco; nada muda no servidor', async () => {
+    const tickets = ticketStore()
+    const { model } = scriptedModel([
+      {
+        calls: [
+          {
+            toolName: 'proporInformacao',
+            input: { codigo: ' tkt-0042 ', mensagem: 'O modelo é HP LaserJet 400.' },
+          },
+        ],
+      },
+      { text: 'Preparei a informação; confirme no cartão abaixo.' },
+    ])
+    const { app } = setup({
+      model,
+      user: client,
+      tickets: store(tickets),
+      describe: async () => null,
+    })
+    const { events } = await send(app, {
+      message: 'acrescenta no TKT-0042 que o modelo é HP LaserJet 400',
+    })
+    expect(events.at(-2)).toEqual({
+      type: 'ticket-action-proposal',
+      action: 'reply',
+      code: 'TKT-0042',
+      subject: 'Impressora do financeiro não imprime',
+      message: 'O modelo é HP LaserJet 400.',
+    })
+    expect(events.at(-1)).toMatchObject({ type: 'end' })
+    // O store da Wen só lê: não há como responder, cancelar ou fechar por ele.
+    expect(Object.keys(tickets)).toEqual(['list', 'get'])
+  })
+
+  it('proposta de informação para chamado resolvido é recusada e sugere chamado novo', async () => {
+    const tickets = ticketStore(ticket({ status: 'resolved' }))
+    const { model, calls } = scriptedModel([
+      {
+        calls: [
+          {
+            toolName: 'proporInformacao',
+            input: { codigo: 'TKT-0042', mensagem: 'Voltou a falhar.' },
+          },
+        ],
+      },
+      { text: 'Esse chamado já foi resolvido. Posso preparar um chamado novo.' },
+    ])
+    const { app } = setup({
+      model,
+      user: client,
+      tickets: store(tickets),
+      describe: async () => null,
+    })
+    const { events } = await send(app, { message: 'o problema do TKT-0042 voltou' })
+    expect(events.some((e) => e.type === 'ticket-action-proposal')).toBe(false)
+    expect(promptOf(calls[1]!)).toContain('recusada')
+    expect(promptOf(calls[1]!)).toContain('proporChamado')
+  })
+
+  it('cancelamento só é proposto enquanto ninguém da equipe respondeu', async () => {
+    for (const [canCancel, expected] of [
+      [false, false],
+      [true, true],
+    ] as const) {
+      const tickets = ticketStore(ticket({ status: 'open', canCancel, messages: [] }))
+      const { model } = scriptedModel([
+        { calls: [{ toolName: 'proporCancelamento', input: { codigo: 'TKT-0042' } }] },
+        { text: 'ok' },
+      ])
+      const { app } = setup({
+        model,
+        user: client,
+        tickets: store(tickets),
+        describe: async () => null,
+      })
+      const { events } = await send(app, { message: 'quero cancelar o TKT-0042' })
+      expect(events.some((e) => e.type === 'ticket-action-proposal' && e.action === 'cancel')).toBe(
+        expected,
+      )
+    }
+  })
+
+  it('no máximo 3 passos por mensagem, mesmo que o modelo continue chamando ferramentas', async () => {
+    const tickets = ticketStore()
+    const { model, calls } = scriptedModel([
+      { calls: [{ toolName: 'listarMeusChamados', input: { escopo: 'todos' } }] },
+    ])
+    const { app } = setup({
+      model,
+      user: client,
+      tickets: store(tickets),
+      describe: async () => null,
+    })
+    await send(app, { message: 'lista tudo de novo e de novo' })
+    expect(calls).toHaveLength(3)
+  })
+
+  it('conta desativada não recebe as ferramentas de chamados', async () => {
+    const { model, calls } = streamingModel(['ok'])
+    const banned = { ...client, banned: true, banExpires: null } as Partial<User>
+    const { app } = setup({
+      model,
+      user: banned,
+      tickets: store(ticketStore()),
+      describe: async () => null,
+    })
+    await send(app, { message: 'o sistema de notas fiscais mostra erro 503' })
+    expect((calls[0] as { tools?: { name: string }[] }).tools?.map((t) => t.name)).toEqual([
+      'proporChamado',
+    ])
+  })
+
+  it('se o modelo só propõe a ação, a Wen ainda fala com o cliente (e a troca é gravada)', async () => {
+    const { model } = scriptedModel([
+      { calls: [{ toolName: 'proporResolucao', input: { codigo: 'TKT-0042' } }] },
+      { calls: [{ toolName: 'listarMeusChamados', input: {} }] },
+      { calls: [{ toolName: 'listarMeusChamados', input: {} }] },
+    ])
+    const { app, saved } = setup({
+      model,
+      user: client,
+      tickets: store(ticketStore()),
+      describe: async () => null,
+    })
+    const { events } = await send(app, { message: 'já resolveu o TKT-0042' })
+    expect(text(events)).toBe(CHAT_ACTION_REPLY)
+    expect(events.find((e) => e.type === 'ticket-action-proposal')).toMatchObject({
+      action: 'resolve',
+    })
+    expect(saved[0]?.reply.content).toBe(CHAT_ACTION_REPLY)
+  })
+
+  it('"meus chamados" do cliente vai para a Wen (não para a resposta pronta) com a nota de consulta', async () => {
+    const { model, calls } = scriptedModel([
+      { calls: [{ toolName: 'listarMeusChamados', input: {} }] },
+      { text: 'Você tem 1 chamado em aberto. Escolha abaixo.' },
+    ])
+    const { app } = setup({
+      model,
+      user: client,
+      tickets: store(ticketStore()),
+      describe: async () => null,
+    })
+    const { events } = await send(app, { message: 'quais são meus chamados?' })
+    expect(events[0]).toEqual({ type: 'start', source: 'llm' })
+    expect(promptOf(calls[0]!)).toContain('a pessoa perguntou dos chamados dela')
+    expect(text(events)).not.toContain('Meus chamados')
+  })
+
+  it('a opção "Como acompanho meu chamado?" também vai para a Wen quando é cliente', async () => {
+    const { model } = scriptedModel([{ text: 'Vou ver seus chamados.' }])
+    const { app } = setup({
+      model,
+      user: client,
+      tickets: store(ticketStore()),
+      describe: async () => null,
+    })
+    const { events } = await send(app, {
+      message: 'Como acompanho meu chamado?',
+      faqId: 'acompanhar-chamado',
+    })
+    expect(events[0]).toEqual({ type: 'start', source: 'llm' })
+  })
+
+  it('visitante, equipe e cliente sem LLM continuam com a resposta pronta', async () => {
+    for (const [user, model] of [
+      [undefined, streamingModel(['x']).model],
+      [{ id: 't1', role: 'technician' } as Partial<User>, streamingModel(['x']).model],
+      [client, null],
+    ] as const) {
+      const { app } = setup({
+        model,
+        user,
+        tickets: store(ticketStore()),
+        describe: async () => null,
+      })
+      const { events } = await send(app, { message: 'quais são meus chamados?' })
+      expect(events[0]).toEqual({ type: 'start', source: 'faq', faqId: 'acompanhar-chamado' })
+    }
+  })
+
+  it('cada ferramenta aparece na hora como atividade, e a lista vai para a tela escolher', async () => {
+    const { model } = scriptedModel([
+      { calls: [{ toolName: 'listarMeusChamados', input: { escopo: 'abertos' } }] },
+      { calls: [{ toolName: 'consultarChamado', input: { codigo: 'tkt-0042' } }] },
+      { text: 'Está em atendimento.' },
+    ])
+    const { app } = setup({
+      model,
+      user: client,
+      tickets: store(ticketStore()),
+      describe: async () => null,
+    })
+    const { events } = await send(app, { message: 'como anda meu chamado?' })
+    const tools = events.filter((e) => e.type === 'tool')
+    expect(tools).toEqual([
+      {
+        type: 'tool',
+        id: 'call-1-0',
+        tool: 'listarMeusChamados',
+        status: 'running',
+        scope: 'abertos',
+      },
+      {
+        type: 'tool',
+        id: 'call-1-0',
+        tool: 'listarMeusChamados',
+        status: 'done',
+        scope: 'abertos',
+        count: 1,
+      },
+      {
+        type: 'tool',
+        id: 'call-2-0',
+        tool: 'consultarChamado',
+        status: 'running',
+        code: 'TKT-0042',
+      },
+      { type: 'tool', id: 'call-2-0', tool: 'consultarChamado', status: 'done', code: 'TKT-0042' },
+    ])
+    // A atividade vem antes do texto da resposta.
+    expect(events.findIndex((e) => e.type === 'tool')).toBeLessThan(
+      events.findIndex((e) => e.type === 'delta'),
+    )
+    expect(events.at(-2)).toEqual({
+      type: 'ticket-list',
+      tickets: [
+        {
+          code: 'TKT-0042',
+          subject: 'Impressora do financeiro não imprime',
+          status: 'in_progress',
+          createdAt: '2026-10-01T12:00:00.000Z',
+        },
+      ],
+    })
+  })
+
+  it('a atividade mostra "não encontrado" e "recusado" sem nada do chamado alheio', async () => {
+    const notFound = scriptedModel([
+      { calls: [{ toolName: 'consultarChamado', input: { codigo: 'TKT-0099' } }] },
+      { text: 'Não encontrei.' },
+    ])
+    const a = setup({
+      model: notFound.model,
+      user: client,
+      tickets: store(ticketStore(null)),
+      describe: async () => null,
+    })
+    const first = await send(a.app, { message: 'como anda o TKT-0099?' })
+    expect(first.events.filter((e) => e.type === 'tool').at(-1)).toMatchObject({
+      status: 'not_found',
+      code: 'TKT-0099',
+    })
+
+    const refused = scriptedModel([
+      { calls: [{ toolName: 'proporCancelamento', input: { codigo: 'TKT-0042' } }] },
+      { text: 'Não dá mais para cancelar.' },
+    ])
+    const b = setup({
+      model: refused.model,
+      user: client,
+      tickets: store(ticketStore()),
+      describe: async () => null,
+    })
+    const second = await send(b.app, { message: 'cancela o TKT-0042' })
+    expect(second.events.filter((e) => e.type === 'tool').at(-1)).toMatchObject({
+      tool: 'proporCancelamento',
+      status: 'refused',
+    })
+  })
+
+  it('proporChamado aparece como atividade; chamada inválida não aparece', async () => {
+    const model = proposingModel(['Preparei.'], {
+      subject: 'Conta bloqueada',
+      description: 'O cliente não consegue entrar mesmo depois de trocar a senha.',
+    })
+    const { app } = setup({ model, describe: async () => null })
+    const { events } = await send(app, { message: 'o relatório de vendas sai com valores errados' })
+    expect(events.filter((e) => e.type === 'tool')).toEqual([
+      { type: 'tool', id: 'call-1', tool: 'proporChamado', status: 'done' },
+    ])
+
+    const invalid = proposingModel(['Vou ver isso.'], { subject: 'x', description: 'curta' })
+    const other = setup({ model: invalid, describe: async () => null })
+    const result = await send(other.app, { message: 'o sistema de notas fiscais mostra erro 503' })
+    expect(result.events.some((e) => e.type === 'tool')).toBe(false)
+  })
+
+  it('só a lista, sem texto: a Wen ainda diz para escolher', async () => {
+    const { model } = scriptedModel([
+      { calls: [{ toolName: 'listarMeusChamados', input: {} }] },
+      { calls: [{ toolName: 'listarMeusChamados', input: {} }] },
+      { calls: [{ toolName: 'listarMeusChamados', input: {} }] },
+    ])
+    const { app } = setup({
+      model,
+      user: client,
+      tickets: store(ticketStore()),
+      describe: async () => null,
+    })
+    const { events } = await send(app, { message: 'meus chamados' })
+    expect(text(events)).toBe(CHAT_LIST_REPLY)
+  })
+
+  it('falha no banco não chega ao modelo com detalhes internos', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const tickets = ticketStore()
+    tickets.get.mockRejectedValue(
+      new Error('select * from ticket where client_id = $1 -- senha hunter2'),
+    )
+    const { model, calls } = scriptedModel([
+      { calls: [{ toolName: 'consultarChamado', input: { codigo: 'TKT-0042' } }] },
+      { text: 'Não consegui consultar agora.' },
+    ])
+    const { app } = setup({
+      model,
+      user: client,
+      tickets: store(tickets),
+      describe: async () => null,
+    })
+    await send(app, { message: 'como está o TKT-0042?' })
+    expect(promptOf(calls[1]!)).not.toContain('hunter2')
+    expect(promptOf(calls[1]!)).toContain('Não consegui consultar os chamados agora.')
+    spy.mockRestore()
   })
 })

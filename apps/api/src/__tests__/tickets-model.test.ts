@@ -1,4 +1,5 @@
 import {
+  toolActivityLabel,
   ACTIVE_TICKET_STATUSES,
   CLIENT_ONLY_STATUSES,
   TERMINAL_TICKET_STATUSES,
@@ -114,5 +115,51 @@ describe('schemas de chamado', () => {
       priority: 'high',
     })
     expect(updateTicketSchema.safeParse({ status: 'pending' }).success).toBe(false)
+  })
+})
+
+describe('linhas de atividade da Wen', () => {
+  it('presente enquanto roda e passado com o resultado', () => {
+    const list = { id: '1', tool: 'listarMeusChamados' as const }
+    expect(toolActivityLabel({ ...list, status: 'running' })).toBe(
+      'Consultando seus chamados em aberto…',
+    )
+    expect(toolActivityLabel({ ...list, status: 'done', count: 3 })).toBe(
+      'Consultei seus chamados em aberto (3)',
+    )
+    expect(toolActivityLabel({ ...list, status: 'done', scope: 'encerrados', count: 0 })).toBe(
+      'Consultei seus chamados encerrados (0)',
+    )
+    expect(toolActivityLabel({ ...list, status: 'done', scope: 'todos' })).toBe(
+      'Consultei seus chamados',
+    )
+    const get = { id: '2', tool: 'consultarChamado' as const, code: 'TKT-0042' }
+    expect(toolActivityLabel({ ...get, status: 'running' })).toBe('Consultando o TKT-0042…')
+    expect(toolActivityLabel({ ...get, status: 'done' })).toBe('Consultei o TKT-0042')
+    expect(toolActivityLabel({ ...get, status: 'not_found' })).toBe(
+      'Não encontrei o TKT-0042 entre os seus chamados',
+    )
+    expect(toolActivityLabel({ ...get, status: 'error' })).toBe(
+      'Não consegui consultar os chamados agora',
+    )
+  })
+
+  it('ações: preparou ou foi recusada', () => {
+    const base = { id: '3', code: 'TKT-0042' }
+    expect(toolActivityLabel({ ...base, tool: 'proporCancelamento', status: 'done' })).toBe(
+      'Preparei o cancelamento do TKT-0042',
+    )
+    expect(toolActivityLabel({ ...base, tool: 'proporCancelamento', status: 'refused' })).toBe(
+      'O TKT-0042 não pode mais ser cancelado',
+    )
+    expect(toolActivityLabel({ ...base, tool: 'proporInformacao', status: 'refused' })).toBe(
+      'O TKT-0042 não recebe informação nova por aqui',
+    )
+    expect(toolActivityLabel({ ...base, tool: 'proporResolucao', status: 'done' })).toBe(
+      'Preparei o fechamento do TKT-0042',
+    )
+    expect(toolActivityLabel({ id: '4', tool: 'proporChamado', status: 'done' })).toBe(
+      'Preparei um chamado para a equipe',
+    )
   })
 })

@@ -185,6 +185,12 @@ export const ticketMessageSchema = z.object({
 })
 export type TicketMessageInput = z.infer<typeof ticketMessageSchema>
 
+/**
+ * Resposta do cliente no chamado. `reopen: false` (informação adicionada pela Wen) recusa chamado
+ * resolvido em vez de reabri-lo: um problema novo vira outro chamado.
+ */
+export const clientReplySchema = ticketMessageSchema.extend({ reopen: z.boolean().default(true) })
+
 /** Alteração feita pela equipe: status, prioridade e responsável (`null` tira o responsável). */
 export const updateTicketSchema = z
   .object({

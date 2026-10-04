@@ -1,6 +1,8 @@
 import type { ChatExchange } from '@f-desk/db'
 import {
+  CHAT_ACTION_REPLY,
   CHAT_ERROR_REPLY,
+  CHAT_LIST_REPLY,
   CHAT_FALLBACK_REPLY,
   CHAT_PROPOSAL_REPLY,
   CHAT_TICKET_DETAILS_REPLY,
@@ -14,15 +16,19 @@ import {
   type ChatEvent,
   type ChatMessage,
   type ChatReplySource,
+  type TicketActionProposal,
+  type TicketChoice,
   type TicketProposal,
 } from '@f-desk/shared'
 import type { LanguageModel } from 'ai'
 import { Hono } from 'hono'
+import { isBanned } from '../middleware/require-role'
 import type { AppEnv } from '../middleware/session'
-import { isTicketRequest } from '../services/faq/intent'
+import { isTicketLookup, isTicketRequest, TRACKING_FAQ_ID } from '../services/faq/intent'
 import { matchFaq } from '../services/faq/match'
 import { describeConversation, type ConversationMeta } from '../services/llm/meta'
-import { streamWenReply } from '../services/llm/reply'
+import { streamWenReply, type WenAudience } from '../services/llm/reply'
+import type { WenTicketStore } from '../services/llm/ticket-tools'
 import { clientIp, quotaKey, type ConsumeQuota } from '../services/rate-limit'
 
 /** Respostas do "Resolveu?" que ficam fora da descrição do chamado montado sem LLM. */
@@ -42,6 +48,11 @@ export interface ChatDeps {
    * contexto do LLM vem só daqui, nunca do `history` do corpo, que o navegador pode forjar.
    */
   loadHistory?: (userId: string, conversationId: string) => Promise<ChatMessage[] | null>
+  /**
+   * Chamados do cliente para as ferramentas da Wen (consultar e propor ações). Só cliente logado
+   * recebe as ferramentas, sempre com o id da sessão; visitante e equipe ficam só com `proporChamado`.
+   */
+  tickets?: WenTicketStore
 }
 
 /**
@@ -84,13 +95,28 @@ export function createChatRoute(deps: ChatDeps) {
             : []
           : parsed.data.history
 
+        // Conta desativada fica como visitante: as ferramentas de chamados ficam do lado de
+        // fora do `requireRole`, então a mesma regra de desativação vale aqui.
+        const audience: WenAudience =
+          !user || isBanned(user) ? 'visitor' : user.role === 'client' ? 'client' : 'staff'
+        const ticketTools =
+          audience === 'client' && deps.model && deps.tickets
+            ? { userId: user!.id, store: deps.tickets }
+            : undefined
+
         // Opção do atendimento guiado: a resposta pronta escolhida, sem depender da busca por palavras.
-        const chosen = faqId ? FAQ.find((entry) => entry.id === faqId) : undefined
+        const chosenFaq = faqId ? FAQ.find((entry) => entry.id === faqId) : undefined
+        // Cliente perguntando dos próprios chamados, com a Wen e as ferramentas disponíveis: a
+        // resposta pronta ("entre em Meus chamados") não serve; a Wen consulta e lista.
+        const ticketLookup = Boolean(
+          ticketTools && (chosenFaq ? chosenFaq.id === TRACKING_FAQ_ID : isTicketLookup(message)),
+        )
+        const chosen = ticketLookup ? undefined : chosenFaq
         // Pedido de chamado não vai para a resposta pronta "como abrir": o Wen prepara o chamado.
-        const ticketRequested = !chosen && isTicketRequest(message)
+        const ticketRequested = !chosen && !ticketLookup && isTicketRequest(message)
         const faq = chosen
           ? { entry: chosen, score: 1 }
-          : ticketRequested
+          : ticketRequested || ticketLookup
             ? null
             : matchFaq(message, history)
         const source: ChatReplySource = faq ? 'faq' : deps.model ? 'llm' : 'fallback'
@@ -105,23 +131,44 @@ export function createChatRoute(deps: ChatDeps) {
             send(faq ? { type: 'start', source, faqId: faq.entry.id } : { type: 'start', source })
             let reply = ''
             let proposal: TicketProposal | undefined
+            let action: TicketActionProposal | undefined
+            let listed: TicketChoice[] | undefined
             try {
               if (source === 'llm' && deps.model) {
                 for await (const part of streamWenReply(deps.model, history, message, {
-                  loggedIn: Boolean(user),
+                  audience,
                   ticketRequested,
+                  ticketLookup,
                   abortSignal: signal,
+                  tickets: ticketTools,
                 })) {
+                  // Atividade das ferramentas vai na hora, para a pessoa ver o que a Wen está fazendo.
+                  if (part.type === 'tool') {
+                    send({ type: 'tool', ...part.activity })
+                    continue
+                  }
+                  if (part.type === 'list') {
+                    listed = part.tickets
+                    continue
+                  }
                   if (part.type === 'proposal') {
                     proposal = { subject: part.subject, description: part.description }
+                    continue
+                  }
+                  if (part.type === 'action') {
+                    action = part.proposal
                     continue
                   }
                   reply += part.text
                   send({ type: 'delta', text: part.text })
                 }
                 // O modelo só chamou a ferramenta: a conversa ainda precisa de uma fala do Wen.
-                if (proposal && !reply.trim()) {
-                  reply = CHAT_PROPOSAL_REPLY
+                if ((proposal || action || listed) && !reply.trim()) {
+                  reply = proposal
+                    ? CHAT_PROPOSAL_REPLY
+                    : action
+                      ? CHAT_ACTION_REPLY
+                      : CHAT_LIST_REPLY
                   send({ type: 'delta', text: reply })
                 }
               } else if (faq) {
@@ -185,8 +232,10 @@ export function createChatRoute(deps: ChatDeps) {
                 console.error('[chat] falha ao gravar a conversa', error)
               }
             }
-            // A proposta vai antes do fim; o chamado só é aberto quando o cliente confirmar.
+            // As propostas vão antes do fim; nada muda até o cliente confirmar no cartão.
             if (proposal) send({ type: 'ticket-proposal', ...proposal })
+            if (action) send({ type: 'ticket-action-proposal', ...action })
+            if (listed) send({ type: 'ticket-list', tickets: listed })
             // Título e tipo só vão para a tela na conversa nova (numa existente o banco mantém os primeiros).
             send(
               savedId && meta && !conversationId

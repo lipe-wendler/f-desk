@@ -388,6 +388,46 @@ a.chat-conversation-status:hover {
   opacity: 0.6;
 }
 
+/* Lista de chamados para escolher: a linha tem código, status, assunto e data. */
+.chat-ticket-choice {
+  padding-top: var(--space-3);
+  padding-bottom: var(--space-3);
+}
+.chat-ticket-choice:disabled {
+  cursor: default;
+}
+.chat-ticket-choice[aria-current] {
+  background: var(--surface-raised);
+  opacity: 1;
+}
+
+/* O que a Wen fez com as ferramentas, acima da fala dela (passos curtos, sem animação). */
+.chat-tools {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.chat-tool {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--ink-muted);
+  font: 400 13px/18px var(--font-sans);
+}
+.chat-tool-done .fw-icon {
+  color: var(--success);
+}
+.chat-tool-refused .fw-icon,
+.chat-tool-not_found .fw-icon {
+  color: var(--accent-text);
+}
+.chat-tool-error .fw-icon {
+  color: var(--danger);
+}
+
 /* Chamado preparado pelo Wen: o cliente confere e confirma. */
 .chat-proposal {
   display: flex;
