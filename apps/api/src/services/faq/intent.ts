@@ -26,3 +26,33 @@ export function isTicketRequest(message: string): boolean {
   if (HOW_TO.test(text) || TRACKING.test(text)) return false
   return REQUEST.some((pattern) => pattern.test(text))
 }
+
+/** Resposta pronta "Como acompanho meu chamado?": para o cliente logado, a Wen lista os chamados. */
+export const TRACKING_FAQ_ID = 'acompanhar-chamado'
+
+const TICKET_WORD = String.raw`(chamados?|tickets?|solicitac(ao|oes))`
+const LOOKUP = [
+  // "meus chamados", "minhas solicitações", "meu chamado", "o meu ticket"
+  new RegExp(String.raw`\b(meus|minhas?|meu) ${TICKET_WORD}\b`),
+  // "status do chamado", "andamento dos chamados", "quais chamados", "listar os tickets"
+  new RegExp(
+    String.raw`\b(status|andamento|situacao|acompanh\w*|ver|veja|mostr\w*|list\w*|quais|novidades?|resposta)\b.*\b${TICKET_WORD}\b`,
+  ),
+  // "chamados abertos", "chamado em andamento"
+  new RegExp(
+    String.raw`\b${TICKET_WORD} (abertos?|em aberto|em andamento|pendentes?|encerrados?)\b`,
+  ),
+  // um código: "TKT-0042", "tkt 42"
+  /\btkt[\s-]?\d+\b/,
+]
+
+/**
+ * A pessoa quer saber dos chamados dela ("quais são meus chamados?", "como está o TKT-0042?",
+ * "status do meu chamado"). Para o cliente logado com a Wen, isso vai às ferramentas de chamados em
+ * vez da resposta pronta que manda abrir "Meus chamados". Pedido de chamado novo não conta.
+ */
+export function isTicketLookup(message: string): boolean {
+  const text = normalize(message)
+  if (isTicketRequest(message)) return false
+  return LOOKUP.some((pattern) => pattern.test(text))
+}

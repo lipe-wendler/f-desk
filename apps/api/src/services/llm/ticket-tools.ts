@@ -5,6 +5,7 @@ import {
   TICKET_MESSAGE_MAX,
   TICKET_STATUS_LABEL,
   type TicketActionProposal,
+  type TicketChoice,
   type TicketStatus,
 } from '@f-desk/shared'
 import { tool } from 'ai'
@@ -85,6 +86,8 @@ const NOT_FOUND = {
  */
 export function buildTicketTools({ userId, store }: { userId: string; store: WenTicketStore }) {
   let proposal: TicketActionProposal | undefined
+  /** Última lista consultada, para a tela mostrar os chamados e a pessoa escolher um. */
+  let listed: TicketChoice[] | undefined
 
   const find = (code: string) => guarded(() => store.get(userId, code))
 
@@ -114,8 +117,16 @@ export function buildTicketTools({ userId, store }: { userId: string; store: Wen
         const { tickets, total } = await guarded(() =>
           store.list({ clientId: userId, scope: SCOPES[escopo], limit: LIST_LIMIT, offset: 0 }),
         )
+        listed = tickets.map((t) => ({
+          code: t.code,
+          subject: t.subject,
+          status: t.status,
+          createdAt: new Date(t.createdAt).toISOString(),
+        }))
         return {
           total,
+          instrucao:
+            'A lista aparece na tela para a pessoa escolher. Não repita todos os itens: diga quantos são e peça para ela escolher um (ou citar o código).',
           chamados: tickets.map((t) => ({
             codigo: t.code,
             assunto: t.subject,
@@ -218,5 +229,7 @@ export function buildTicketTools({ userId, store }: { userId: string; store: Wen
     tools,
     /** A última proposta válida desta resposta (ou nenhuma). */
     proposal: () => proposal,
+    /** Os chamados da última lista consultada (ou nenhum). */
+    listed: () => listed,
   }
 }

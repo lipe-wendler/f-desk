@@ -6,6 +6,7 @@ import {
   TICKET_CODE_PATTERN,
   TICKET_MESSAGE_MAX,
   type ChatSource,
+  type TicketStatus,
 } from './tickets'
 
 /** Tamanho máximo de uma mensagem digitada no chat. */
@@ -56,6 +57,10 @@ export type ChatEvent =
    * vale para o status; nada muda até o cliente confirmar no cartão (pela rota de chamados).
    */
   | ({ type: 'ticket-action-proposal' } & TicketActionProposal)
+  /** O que a Wen está fazendo com as ferramentas (aparece na hora, como linhas acima da fala). */
+  | ({ type: 'tool' } & ToolActivity)
+  /** Chamados que a Wen listou: a pessoa escolhe um na tela para continuar a conversa sobre ele. */
+  | { type: 'ticket-list'; tickets: TicketChoice[] }
   | { type: 'error'; message: string }
 
 export const CHAT_FALLBACK_REPLY =
@@ -76,6 +81,9 @@ export const CHAT_PROPOSAL_REPLY =
 /** Texto da resposta quando o LLM só propõe uma ação num chamado, sem escrever nada antes. */
 export const CHAT_ACTION_REPLY =
   'Preparei a ação no seu chamado. Nada foi feito ainda: confira e confirme no cartão abaixo.'
+
+/** Texto da resposta quando o LLM só lista os chamados, sem escrever nada. */
+export const CHAT_LIST_REPLY = 'Estes são os seus chamados. Escolha um abaixo para continuarmos.'
 
 /** Fala do Wen gravada na conversa quando o chamado é aberto pela proposta. */
 export const ticketCreatedReply = (code: string) =>
@@ -111,3 +119,75 @@ export const ticketActionProposalSchema = z.discriminatedUnion('action', [
   }),
 ])
 export type TicketActionProposal = z.infer<typeof ticketActionProposalSchema>
+
+/** Ferramentas da Wen que aparecem como atividade na conversa. */
+export const WEN_TOOLS = [
+  'listarMeusChamados',
+  'consultarChamado',
+  'proporInformacao',
+  'proporCancelamento',
+  'proporResolucao',
+  'proporChamado',
+] as const
+export type WenTool = (typeof WEN_TOOLS)[number]
+
+/**
+ * Uma chamada de ferramenta da Wen: `running` enquanto executa; depois `done`, `refused` (a ação
+ * não vale para o chamado), `not_found` (chamado que não é da pessoa ou não existe) ou `error`.
+ * `code` e `count` vêm do servidor (o código normalizado e quantos chamados a lista trouxe).
+ */
+export interface ToolActivity {
+  id: string
+  tool: WenTool
+  status: 'running' | 'done' | 'refused' | 'not_found' | 'error'
+  code?: string
+  scope?: 'abertos' | 'encerrados' | 'todos'
+  count?: number
+}
+
+/** Chamado da lista que a Wen mostra para a pessoa escolher. */
+export interface TicketChoice {
+  code: string
+  subject: string
+  status: TicketStatus
+  createdAt: string
+}
+
+const of = (code?: string) => code ?? 'chamado'
+
+/** Texto da linha de atividade, no presente enquanto roda e no passado quando termina. */
+export function toolActivityLabel(activity: ToolActivity): string {
+  const { tool, status, code, scope, count } = activity
+  const ticket = of(code)
+  if (status === 'error') return 'Não consegui consultar os chamados agora'
+  if (status === 'not_found') return `Não encontrei o ${ticket} entre os seus chamados`
+  const running = status === 'running'
+  switch (tool) {
+    case 'listarMeusChamados': {
+      const which = scope === 'encerrados' ? 'encerrados' : scope === 'todos' ? '' : 'em aberto'
+      const label = `seus chamados${which ? ` ${which}` : ''}`
+      return running
+        ? `Consultando ${label}…`
+        : `Consultei ${label}${count === undefined ? '' : ` (${count})`}`
+    }
+    case 'consultarChamado':
+      return running ? `Consultando o ${ticket}…` : `Consultei o ${ticket}`
+    case 'proporInformacao':
+      if (status === 'refused') return `O ${ticket} não recebe informação nova por aqui`
+      return running
+        ? `Preparando a informação para o ${ticket}…`
+        : `Preparei uma informação para o ${ticket}`
+    case 'proporCancelamento':
+      if (status === 'refused') return `O ${ticket} não pode mais ser cancelado`
+      return running
+        ? `Preparando o cancelamento do ${ticket}…`
+        : `Preparei o cancelamento do ${ticket}`
+    case 'proporResolucao':
+      if (status === 'refused') return `O ${ticket} já está encerrado`
+      return running
+        ? `Preparando o fechamento do ${ticket}…`
+        : `Preparei o fechamento do ${ticket}`
+    case 'proporChamado':
+      return running ? 'Preparando um chamado…' : 'Preparei um chamado para a equipe'
+  }
+}

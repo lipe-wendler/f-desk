@@ -1,12 +1,16 @@
 import {
+  TICKET_CODE_PATTERN,
   ticketProposalSchema,
   type ChatMessage,
   type TicketActionProposal,
+  type TicketChoice,
   type TicketProposal,
+  type ToolActivity,
+  type WenTool,
 } from '@f-desk/shared'
 import { stepCountIs, streamText, tool, type LanguageModel, type ModelMessage } from 'ai'
 import { WEN_INSTRUCTIONS } from './prompt'
-import { buildTicketTools, type WenTicketStore } from './ticket-tools'
+import { buildTicketTools, TICKET_TOOL_NAMES, type WenTicketStore } from './ticket-tools'
 
 /** Mensagens anteriores que vão para o modelo (as mais recentes). */
 const HISTORY_LIMIT = 12
@@ -33,6 +37,10 @@ export function contextNote(audience: WenAudience) {
 export const TICKET_REQUEST_NOTE =
   'Contexto do sistema: a pessoa pediu um chamado ou alguém da equipe. Se ela já contou o problema, chame proporChamado agora; se ainda não contou, pergunte o que está acontecendo.'
 
+/** Nota quando o cliente pergunta dos próprios chamados: a Wen consulta em vez de mandar para a tela. */
+export const TICKET_LOOKUP_NOTE =
+  'Contexto do sistema: a pessoa perguntou dos chamados dela. Se ela citou um código, use consultarChamado; senão, use listarMeusChamados (escopo abertos, a não ser que ela peça outros) para ela escolher um. Não mande a pessoa para "Meus chamados".'
+
 /** Nome da ferramenta que o modelo chama quando não consegue resolver (citado no prompt). */
 export const PROPOSE_TICKET_TOOL = 'proporChamado'
 
@@ -51,6 +59,8 @@ export type WenReplyPart =
   | { type: 'text'; text: string }
   | ({ type: 'proposal' } & TicketProposal)
   | { type: 'action'; proposal: TicketActionProposal }
+  | { type: 'tool'; activity: ToolActivity }
+  | { type: 'list'; tickets: TicketChoice[] }
 
 /**
  * Resposta da Wen em streaming: os pedaços de texto conforme chegam e, se o modelo chamar
@@ -66,6 +76,8 @@ export async function* streamWenReply(
   options: {
     audience: WenAudience
     ticketRequested?: boolean
+    /** O cliente perguntou dos próprios chamados (só vale com `tickets`). */
+    ticketLookup?: boolean
     abortSignal?: AbortSignal
     tickets?: { userId: string; store: WenTicketStore }
   },
@@ -79,6 +91,9 @@ export async function* streamWenReply(
       content: [
         { type: 'text', text: contextNote(options.audience) },
         ...(options.ticketRequested ? [{ type: 'text' as const, text: TICKET_REQUEST_NOTE }] : []),
+        ...(options.ticketLookup && ticketTools
+          ? [{ type: 'text' as const, text: TICKET_LOOKUP_NOTE }]
+          : []),
         { type: 'text', text: message },
       ],
     },
@@ -112,14 +127,69 @@ export async function* streamWenReply(
     abortSignal: options.abortSignal,
   })
 
+  /** Chamadas anunciadas como `running`: só elas ganham a linha de resultado. */
+  const started = new Map<string, ToolActivity>()
+
   for await (const part of result.fullStream) {
     if (part.type === 'text-delta') yield { type: 'text', text: part.text }
     else if (part.type === 'tool-call' && part.toolName === PROPOSE_TICKET_TOOL && !part.invalid) {
       // Confere de novo: o provedor pode devolver campos fora dos limites do chamado.
       const proposal = ticketProposalSchema.safeParse(part.input)
-      if (proposal.success) yield { type: 'proposal', ...proposal.data }
+      if (proposal.success) {
+        yield {
+          type: 'tool',
+          activity: { id: part.toolCallId, tool: PROPOSE_TICKET_TOOL, status: 'done' },
+        }
+        yield { type: 'proposal', ...proposal.data }
+      }
+    } else if (part.type === 'tool-call' && !part.invalid && isTicketTool(part.toolName)) {
+      const activity = runningActivity(part.toolCallId, part.toolName, part.input)
+      started.set(part.toolCallId, activity)
+      yield { type: 'tool', activity }
+    } else if (part.type === 'tool-result' && started.has(part.toolCallId)) {
+      yield { type: 'tool', activity: finishedActivity(started.get(part.toolCallId)!, part.output) }
+    } else if (part.type === 'tool-error' && started.has(part.toolCallId)) {
+      yield { type: 'tool', activity: { ...started.get(part.toolCallId)!, status: 'error' } }
     } else if (part.type === 'error') throw part.error
   }
+  const listed = ticketTools?.listed()
+  if (listed?.length) yield { type: 'list', tickets: listed }
   const action = ticketTools?.proposal()
   if (action) yield { type: 'action', proposal: action }
+}
+
+const TICKET_TOOLS: readonly string[] = Object.values(TICKET_TOOL_NAMES)
+const isTicketTool = (name: string): name is WenTool => TICKET_TOOLS.includes(name)
+
+/** Código e escopo pedidos pelo modelo (já validados pelo `inputSchema`), para a linha de atividade. */
+function runningActivity(id: string, tool: WenTool, input: unknown): ToolActivity {
+  const { codigo, escopo } = (input ?? {}) as { codigo?: unknown; escopo?: unknown }
+  const code = typeof codigo === 'string' ? codigo.trim().toUpperCase() : undefined
+  return {
+    id,
+    tool,
+    status: 'running',
+    ...(code && TICKET_CODE_PATTERN.test(code) ? { code } : {}),
+    ...(escopo === 'abertos' || escopo === 'encerrados' || escopo === 'todos'
+      ? { scope: escopo }
+      : {}),
+  }
+}
+
+/** Resultado da ferramenta (`ticket-tools.ts`) traduzido para a linha de atividade. */
+function finishedActivity(started: ToolActivity, output: unknown): ToolActivity {
+  const result = (output ?? {}) as {
+    encontrado?: boolean
+    proposta?: string
+    codigo?: unknown
+    chamados?: unknown
+  }
+  if (result.encontrado === false) return { ...started, status: 'not_found' }
+  if (result.proposta === 'recusada') return { ...started, status: 'refused' }
+  return {
+    ...started,
+    status: 'done',
+    ...(typeof result.codigo === 'string' ? { code: result.codigo } : {}),
+    ...(Array.isArray(result.chamados) ? { count: result.chamados.length } : {}),
+  }
 }
