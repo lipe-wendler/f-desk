@@ -125,7 +125,9 @@ O que já estava bom e continua valendo:
     uma mensagem de cliente logado pode custar até 3 passos do modelo (`MAX_STEPS` em
     `services/llm/reply.ts`), mas conta uma vez só na cota do chat (20 a cada 10 minutos). É
     intencional: o teto limita o custo de cada mensagem, e visitante e equipe continuam com um passo
-    só. Rever se o custo do provedor pesar.
+    só. Pergunta do cliente sobre os próprios chamados ("meus chamados", "tkt 42", a opção guiada
+    "Como acompanho meu chamado?") também deixou de usar a resposta pronta e vai para a Wen, dentro
+    da mesma cota e do mesmo teto. Rever se o custo do provedor pesar.
 
 ## Checklist de infraestrutura
 
