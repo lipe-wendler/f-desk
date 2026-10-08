@@ -129,6 +129,37 @@ test('continua liberando o uso comum do git e do gh', () => {
   }
 })
 
+test('barra configuração do git por ambiente, heredoc lido por shell e merge com opções no gh', () => {
+  for (const cmd of [
+    'GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0=/dev/null git -c remote.origin.push=HEAD:refs/heads/main push origin',
+    "GIT_CONFIG_PARAMETERS=\"'core.hooksPath'='/dev/null'\" git push origin feat/x",
+    "env -S 'git -c core.hooksPath=/dev/null push origin feat/x'",
+    "bash <<'EOF'\ngit push --no-verify origin main\nEOF",
+    'sh <<EOF\ngit push origin main\nEOF',
+    'cat <<<EOF\ngit push --no-verify origin main\nEOF',
+    'echo "<<EOF"\ngit push --no-verify origin main\nEOF',
+    'HUSKY=0 sh -c "git push origin feat/x"',
+    'gh pr -R lipe-wendler/h1-tecnologia merge 3 --squash',
+    "gh alias set m 'pr merge'",
+    'git -c core.hooksPath=/dev/null push origin feat/x --list',
+  ]) {
+    assert.equal(bash(cmd), 'deny', cmd)
+  }
+})
+
+test('não barra stash, leitura de config nem crases em aspas simples', () => {
+  for (const cmd of [
+    'git stash push -m main',
+    'git stash push --all',
+    'git config --get core.hooksPath',
+    "git commit -m 'docs: explica \`git push origin main\`'",
+    'gh pr create --title "fix: x" --body "$(cat <<\'EOF\'\ncorpo\nEOF\n)"',
+    'gh pr view 3 --json mergeable',
+  ]) {
+    assert.equal(bash(cmd), 'allow', cmd)
+  }
+})
+
 test('bloqueia merge e escrita na main pelo MCP do GitHub', () => {
   assert.equal(decision('mcp__github__merge_pull_request', { pullNumber: 1 }), 'deny')
   assert.equal(decision('mcp__github__enable_pr_auto_merge', { pullNumber: 1 }), 'deny')
