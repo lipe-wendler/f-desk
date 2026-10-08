@@ -71,6 +71,64 @@ test('libera o fluxo normal da branch da tarefa', () => {
   }
 })
 
+test('não se perde com opções globais do git, sudo ou alias', () => {
+  for (const cmd of [
+    'git --git-dir .git push origin main',
+    'git --git-dir .git -c core.hooksPath=/dev/null push origin main',
+    'git --work-tree . --namespace x push origin main',
+    'sudo -u git git push origin main',
+    'env -u git git push origin main',
+    'git -c alias.p=push p origin main',
+    'git -c alias.p=push -c core.hooksPath=/dev/null p origin main',
+    'git config alias.p push',
+    'git --config-env=core.hooksPath=X push origin feat/x',
+  ]) {
+    assert.equal(bash(cmd), 'deny', cmd)
+  }
+})
+
+test('confere os hooks do Git no comando inteiro, sem diferenciar maiúsculas', () => {
+  for (const cmd of [
+    'export HUSKY=0 && git push origin feat/x',
+    'HUSKY=0; git push origin feat/x',
+    'git config core.hooksPath /dev/null && git push origin feat/x',
+    'git config core.hooksPath /dev/null',
+    'git -c core.hookspath=/dev/null push origin feat/x',
+  ]) {
+    assert.equal(bash(cmd), 'deny', cmd)
+  }
+})
+
+test('enxerga comandos dentro de outro shell, heredoc e continuação de linha', () => {
+  for (const cmd of [
+    'cat <<EOF && git push origin main\nx\nEOF',
+    'sh -c "git push origin main"',
+    "bash -lc 'git push --no-verify origin feat/x'",
+    'eval "git push origin main"',
+    'echo "$(git push origin main)"',
+    'echo `git push origin main`',
+    'git push origin ma\\\nin',
+    'gh -R dono/repo pr merge 1',
+  ]) {
+    assert.equal(bash(cmd), 'deny', cmd)
+  }
+})
+
+test('continua liberando o uso comum do git e do gh', () => {
+  for (const cmd of [
+    'HUSKY=0 git commit -m "chore: ajusta-algo"',
+    'git log --oneline main..HEAD',
+    'git diff origin/main...HEAD',
+    "git commit -m 'docs: o hook barra git push origin main'",
+    'git commit -F - <<EOF\nfix: barra git push origin main\nEOF',
+    'sh -c "pnpm lint && pnpm test"',
+    'git push -u origin fix/hook && gh pr view 22',
+    'git config user.name "Felipe"',
+  ]) {
+    assert.equal(bash(cmd), 'allow', cmd)
+  }
+})
+
 test('bloqueia merge e escrita na main pelo MCP do GitHub', () => {
   assert.equal(decision('mcp__github__merge_pull_request', { pullNumber: 1 }), 'deny')
   assert.equal(decision('mcp__github__enable_pr_auto_merge', { pullNumber: 1 }), 'deny')
