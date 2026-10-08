@@ -40,12 +40,48 @@ if (/^mcp__.*github.*__/i.test(tool)) {
     deny('Escrita direta na main pela API do GitHub está bloqueada.')
 }
 
+const SHELL = /^(sh|bash|zsh|dash|ksh)$/
+const READS_COMMANDS = /(^|[\s;&|(])(sh|bash|zsh|dash|ksh|source|eval|xargs|\.)(\s|$)/
+
+/** O texto termina dentro de aspas ou de um comentário (`#` no começo de uma palavra)? */
+function inQuoteOrComment(text) {
+  let quote = null
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i]
+    if (quote) {
+      if (ch === quote) quote = null
+      else if (ch === '\\' && quote === '"') i++
+    } else if (ch === '\\') i++
+    else if (ch === "'" || ch === '"') quote = ch
+    else if (ch === '#' && (i === 0 || /\s/.test(text[i - 1]))) return true
+  }
+  return quote !== null
+}
+
 /**
- * Remove o corpo de heredoc (`<<'EOF'` … `EOF`): é texto passado ao comando, não argumento. O resto
- * da linha do `<<EOF` fica, porque o shell o executa (`cat <<EOF && git push …`).
+ * Tira o corpo dos heredocs (`<<'EOF'` … `EOF`): é texto passado ao comando, não comando. O resto
+ * da linha do `<<EOF` fica, porque o shell o executa (`cat <<EOF && git push …`). Quando quem lê o
+ * corpo é um shell (`bash <<EOF`), o corpo é comando e fica. `<<<` (here-string) e `<<` entre aspas
+ * ou depois de `#` não abrem heredoc. Varredura linha a linha, sem regex com retrocesso.
  */
 function withoutHeredocs(command) {
-  return command.replace(/<<-?\s*(['"]?)(\w+)\1([^\n]*)\n[\s\S]*?\n\s*\2(?=\n|$)/g, ' $3')
+  const lines = command.split('\n')
+  const out = []
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    const m = /(?<!<)<<(?!<)-?\s*(['"]?)(\w+)\1/.exec(line)
+    const before = m ? line.slice(0, m.index) : ''
+    const end =
+      m && !inQuoteOrComment(before) ? lines.findIndex((l, j) => j > i && l.trim() === m[2]) : -1
+    if (end < 0) {
+      out.push(line)
+      continue
+    }
+    out.push(before + ' ' + line.slice(m.index + m[0].length))
+    if (READS_COMMANDS.test(before)) out.push(...lines.slice(i + 1, end))
+    i = end
+  }
+  return out.join('\n')
 }
 
 /**
@@ -95,18 +131,22 @@ function segments(command) {
 }
 
 /**
- * Comandos que o shell roda dentro deste: `$(…)` e crases (inclusive entre aspas duplas),
- * `sh -c "…"` / `bash -lc "…"` e `eval …`. São conferidos como comandos à parte.
+ * Comandos que o shell roda dentro deste: `$(…)` e crases (fora de aspas simples, onde o shell não
+ * substitui), `sh -c "…"` / `bash -lc "…"`, `eval …` e `env -S "…"`. São conferidos à parte.
  */
 function nestedCommands(command, segs) {
-  const nested = [...command.matchAll(/\$\(([^()]*)\)|`([^`]*)`/g)].map((m) => m[1] ?? m[2])
+  const unquoted = command.replace(/'[^']*'/g, "''")
+  const nested = [...unquoted.matchAll(/\$\(([^()]*)\)|`([^`]*)`/g)].map((m) => m[1] ?? m[2])
   for (const seg of segs) {
+    const shell = seg.findIndex((t) => SHELL.test(base(t)))
     seg.forEach((t, i) => {
       const prev = seg[i - 1] ?? ''
-      const shell = seg.slice(0, i).some((x) => /^(sh|bash|zsh|dash|ksh)$/.test(base(x)))
-      if (shell && /^-[a-z]*c[a-z]*$/.test(prev)) nested.push(t)
+      if (shell >= 0 && i > shell && /^-[a-z]*c[a-z]*$/.test(prev)) nested.push(t)
+      if (/^(-[a-zA-Z]*S|--split-string)$/.test(prev) && seg.some((x) => base(x) === 'env'))
+        nested.push(t)
+      if (/^--split-string=/.test(t)) nested.push(t.slice(t.indexOf('=') + 1))
     })
-    const ev = seg.findIndex((t) => t === 'eval')
+    const ev = seg.indexOf('eval')
     if (ev >= 0) nested.push(seg.slice(ev + 1).join(' '))
   }
   return nested
@@ -124,7 +164,8 @@ const isGit = (t) => base(t) === 'git'
 function gitPushArgs(seg) {
   const start = seg.findIndex(isGit)
   if (start < 0) return null
-  const at = seg.indexOf('push', start + 1)
+  // `git stash push` guarda alterações locais; não é push para o remoto.
+  const at = seg.findIndex((t, i) => i > start && t === 'push' && seg[i - 1] !== 'stash')
   return at < 0 ? null : seg.slice(at + 1)
 }
 
@@ -143,16 +184,23 @@ function checkGitPush(args) {
 }
 
 /**
- * Regras que valem para o trecho do git inteiro, ache ou não o `push`: alias definido na hora
- * (`-c alias.p=push`, `git config alias.p push`) esconde o subcomando, e `core.hooksPath` (a chave
- * não diferencia maiúsculas) desliga o `pre-push`, seja por `-c`, `--config-env` ou `git config`,
- * que grava a troca para as próximas chamadas.
+ * Regras que valem para o trecho do git inteiro (inclusive o que vem antes do `git`, como variáveis
+ * de ambiente), ache ou não o `push`: alias definido na hora (`-c alias.p=push`, `git config alias.p
+ * push`) esconde o subcomando; `core.hooksPath` (a chave não diferencia maiúsculas) desliga o
+ * `pre-push`, por `-c`, `--config-env`, `git config` (que grava para as próximas chamadas) ou pelas
+ * variáveis `GIT_CONFIG_*`, que passam qualquer configuração sem aparecer depois do `git`.
  */
 function checkGitSegment(seg) {
-  const rest = seg.slice(seg.findIndex(isGit) + 1)
-  if (rest.some((t) => /(^|^-c|=)alias\./i.test(t) || t.startsWith('--config-env')))
+  if (seg.some((t) => /^GIT_CONFIG_(COUNT|KEY_\d+|VALUE_\d+|PARAMETERS)=/.test(t)))
+    deny('Configuração do git por variável de ambiente (`GIT_CONFIG_*`) está bloqueada.')
+  if (seg.some((t) => /(^|^-c|=)alias\./i.test(t) || t.startsWith('--config-env')))
     deny('Alias do git definido no comando está bloqueado (pode esconder um push).')
-  if (rest.some((t) => /core\.hookspath/i.test(t)))
+  // Só leitura (`git config --get core.hooksPath`) é diagnóstico e fica liberada.
+  const readsConfig =
+    seg.includes('config') &&
+    !gitPushArgs(seg) &&
+    seg.some((t) => /^--(get|get-all|get-regexp|list)$|^-l$/.test(t))
+  if (!readsConfig && seg.some((t) => /core\.hookspath/i.test(t)))
     deny('Trocar o `core.hooksPath` (desliga os hooks do Git) está bloqueado.')
 }
 
@@ -170,13 +218,29 @@ function isGhApiWrite(args) {
   return method ? method.toUpperCase() !== 'GET' : fields
 }
 
+/** Primeiro argumento depois de `i` que não é opção (`-R dono/repo` e `--repo x` levam valor). */
+function nextArg(tokens, i) {
+  let j = i + 1
+  while (j < tokens.length && tokens[j].startsWith('-'))
+    j += /^(-R|--repo)$/.test(tokens[j]) ? 2 : 1
+  return tokens[j]
+}
+
 function checkGh(seg) {
   const start = seg.findIndex((t) => base(t) === 'gh')
   if (start < 0) return
-  // Procura o subcomando depois de opções globais (`gh -R dono/repo pr merge`).
+  // Procura o subcomando depois de opções globais (`gh -R dono/repo pr merge`, `gh pr -R x merge`).
   const rest = seg.slice(start + 1)
   const pr = rest.indexOf('pr')
-  if (pr >= 0 && rest[pr + 1] === 'merge') deny('Merge de PR pelo Claude está bloqueado.')
+  if (pr >= 0 && nextArg(rest, pr) === 'merge') deny('Merge de PR pelo Claude está bloqueado.')
+  // Alias do gh pode esconder `pr merge` ou `api` (`gh alias set m 'pr merge'`).
+  const alias = rest.indexOf('alias')
+  if (
+    alias >= 0 &&
+    /^(set|import)$/.test(nextArg(rest, alias) ?? '') &&
+    rest.some((t) => /merge|api/.test(t))
+  )
+    deny('Alias do gh com `merge` ou `api` está bloqueado.')
   const api = rest.indexOf('api')
   if (api < 0) return
   const args = rest.slice(api + 1)
@@ -192,24 +256,23 @@ function checkGh(seg) {
     deny('Escrita na main pela API do GitHub está bloqueada.')
 }
 
-function checkCommand(command, depth = 0) {
+function checkCommand(command, depth = 0, huskyOff = false) {
   const clean = withoutHeredocs(command)
   const segs = segments(clean)
-  const tokens = segs.flat()
-  let pushes = false
+  // `HUSKY=0` desliga o pre-push em qualquer ponto do comando (`export HUSKY=0 && git push …`) e
+  // vale também para os comandos de dentro (`HUSKY=0 sh -c "git push …"`).
+  const husky = huskyOff || segs.flat().some((t) => /^HUSKY=0$/.test(t))
   for (const seg of segs) {
     if (seg.some(isGit)) checkGitSegment(seg)
     const pushArgs = gitPushArgs(seg)
     if (pushArgs) {
-      pushes = true
+      if (husky) deny('Push com os hooks do Git desligados está bloqueado.')
       checkGitPush(pushArgs)
     }
     checkGh(seg)
   }
-  // `HUSKY=0` desliga o pre-push em qualquer ponto do comando (`export HUSKY=0 && git push …`).
-  if (pushes && tokens.some((t) => /^HUSKY=0$/.test(t)))
-    deny('Push com os hooks do Git desligados está bloqueado.')
-  if (depth < 3) for (const inner of nestedCommands(clean, segs)) checkCommand(inner, depth + 1)
+  if (depth < 3)
+    for (const inner of nestedCommands(clean, segs)) checkCommand(inner, depth + 1, husky)
 }
 
 if (tool === 'Bash') checkCommand(String(args.command ?? ''))
