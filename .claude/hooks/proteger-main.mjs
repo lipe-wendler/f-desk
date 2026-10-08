@@ -41,7 +41,7 @@ if (/^mcp__.*github.*__/i.test(tool)) {
 }
 
 const SHELL = /^(sh|bash|zsh|dash|ksh)$/
-const READS_COMMANDS = /(^|[\s;&|(])(sh|bash|zsh|dash|ksh|source|eval|xargs|\.)(\s|$)/
+const READS_COMMANDS = /(^|[\s;&|(/])(sh|bash|zsh|dash|ksh|source|eval|xargs|\.)(\s|$)/
 
 /** O texto termina dentro de aspas ou de um comentário (`#` no começo de uma palavra)? */
 function inQuoteOrComment(text) {
@@ -71,8 +71,12 @@ function withoutHeredocs(command) {
     const line = lines[i]
     const m = /(?<!<)<<(?!<)-?\s*(['"]?)(\w+)\1/.exec(line)
     const before = m ? line.slice(0, m.index) : ''
+    // Dentro de `$(( … ))` / `(( … ))`, `<<` é deslocamento de bits, não heredoc.
+    const arithmetic = (before.match(/\(\(/g) ?? []).length > (before.match(/\)\)/g) ?? []).length
     const end =
-      m && !inQuoteOrComment(before) ? lines.findIndex((l, j) => j > i && l.trim() === m[2]) : -1
+      m && !arithmetic && !inQuoteOrComment(before)
+        ? lines.findIndex((l, j) => j > i && l.trim() === m[2])
+        : -1
     if (end < 0) {
       out.push(line)
       continue
@@ -131,11 +135,36 @@ function segments(command) {
 }
 
 /**
+ * O comando com o conteúdo entre aspas simples apagado (ali o shell não substitui `$(…)` nem
+ * crases). Aspas simples dentro de aspas duplas são texto comum e não apagam nada.
+ */
+function withoutSingleQuoted(command) {
+  let out = ''
+  let quote = null
+  for (let i = 0; i < command.length; i++) {
+    const ch = command[i]
+    if (quote === "'") {
+      if (ch === "'") quote = null
+      continue
+    }
+    // Caractere escapado (`\$`, `\'`, `\"`) é texto: não abre aspas nem substituição.
+    if (ch === '\\') {
+      i++
+      continue
+    }
+    if (quote === '"' && ch === '"') quote = null
+    else if (!quote && (ch === "'" || ch === '"')) quote = ch
+    out += ch
+  }
+  return out
+}
+
+/**
  * Comandos que o shell roda dentro deste: `$(…)` e crases (fora de aspas simples, onde o shell não
  * substitui), `sh -c "…"` / `bash -lc "…"`, `eval …` e `env -S "…"`. São conferidos à parte.
  */
 function nestedCommands(command, segs) {
-  const unquoted = command.replace(/'[^']*'/g, "''")
+  const unquoted = withoutSingleQuoted(command)
   const nested = [...unquoted.matchAll(/\$\(([^()]*)\)|`([^`]*)`/g)].map((m) => m[1] ?? m[2])
   for (const seg of segs) {
     const shell = seg.findIndex((t) => SHELL.test(base(t)))
@@ -165,7 +194,9 @@ function gitPushArgs(seg) {
   const start = seg.findIndex(isGit)
   if (start < 0) return null
   // `git stash push` guarda alterações locais; não é push para o remoto.
-  const at = seg.findIndex((t, i) => i > start && t === 'push' && seg[i - 1] !== 'stash')
+  // Só vale quando `stash` é o subcomando logo depois do `git`: `git --work-tree stash push` é push.
+  const stash = seg[start + 1] === 'stash' ? start + 2 : -1
+  const at = seg.findIndex((t, i) => i > start && i !== stash && t === 'push')
   return at < 0 ? null : seg.slice(at + 1)
 }
 
@@ -196,8 +227,9 @@ function checkGitSegment(seg) {
   if (seg.some((t) => /(^|^-c|=)alias\./i.test(t) || t.startsWith('--config-env')))
     deny('Alias do git definido no comando está bloqueado (pode esconder um push).')
   // Só leitura (`git config --get core.hooksPath`) é diagnóstico e fica liberada.
+  const git = seg.findIndex(isGit)
   const readsConfig =
-    seg.includes('config') &&
+    seg[git + 1] === 'config' &&
     !gitPushArgs(seg) &&
     seg.some((t) => /^--(get|get-all|get-regexp|list)$|^-l$/.test(t))
   if (!readsConfig && seg.some((t) => /core\.hookspath/i.test(t)))

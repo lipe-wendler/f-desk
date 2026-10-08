@@ -160,6 +160,19 @@ test('não barra stash, leitura de config nem crases em aspas simples', () => {
   }
 })
 
+test('as exceções de stash, leitura de config, aspas simples e heredoc não abrem brecha', () => {
+  for (const cmd of [
+    'git --work-tree stash push origin main',
+    'git --namespace stash push --no-verify origin feat/x',
+    'git -c core.hooksPath=/dev/null config --list',
+    'echo "it\'s $(git push origin main) ok\'"',
+    '/bin/bash <<EOF\ngit push origin main\nEOF',
+    'x=$((1<<EOF))\ngit push --no-verify origin main\nEOF',
+  ]) {
+    assert.equal(bash(cmd), 'deny', cmd)
+  }
+})
+
 test('bloqueia merge e escrita na main pelo MCP do GitHub', () => {
   assert.equal(decision('mcp__github__merge_pull_request', { pullNumber: 1 }), 'deny')
   assert.equal(decision('mcp__github__enable_pr_auto_merge', { pullNumber: 1 }), 'deny')
